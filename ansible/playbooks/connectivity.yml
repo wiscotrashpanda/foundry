@@ -1,0 +1,8 @@
+---
+- name: Verify SSH connectivity to foundry
+  hosts: foundry
+  gather_facts: false
+
+  tasks:
+    - name: Ping foundry through Ansible
+      ansible.builtin.ping:
