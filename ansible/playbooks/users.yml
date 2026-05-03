@@ -30,6 +30,7 @@
     - name: Ensure user shell packages exist
       ansible.builtin.apt:
         name:
+          - eza
           - git
           - ncurses-bin
           - zsh
@@ -134,6 +135,17 @@
         group: "{{ item }}"
         mode: "0644"
         force: false
+      loop: "{{ foundry_users }}"
+
+    - name: Alias ls to eza for human users
+      ansible.builtin.blockinfile:
+        path: "/home/{{ item }}/.zshrc"
+        marker: "# {mark} ANSIBLE MANAGED EZA ALIASES"
+        block: |
+          alias ls="eza"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0644"
       loop: "{{ foundry_users }}"
 
     - name: Install Oh My Zsh for human users
