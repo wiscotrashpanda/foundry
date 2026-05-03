@@ -31,10 +31,38 @@
       ansible.builtin.apt:
         name:
           - git
+          - ncurses-bin
           - zsh
         state: present
         update_cache: true
         cache_valid_time: 3600
+
+    - name: Ensure shared terminfo source directory exists
+      ansible.builtin.file:
+        path: /usr/local/share/foundry/terminfo
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install xterm-ghostty terminfo source
+      ansible.builtin.copy:
+        src: xterm-ghostty.terminfo
+        dest: /usr/local/share/foundry/terminfo/xterm-ghostty.terminfo
+        owner: root
+        group: root
+        mode: "0644"
+      register: foundry_xterm_ghostty_source
+
+    - name: Check for system xterm-ghostty terminfo
+      ansible.builtin.stat:
+        path: /usr/share/terminfo/x/xterm-ghostty
+      register: foundry_xterm_ghostty_terminfo
+
+    - name: Compile system xterm-ghostty terminfo
+      ansible.builtin.command:
+        cmd: tic -x -o /usr/share/terminfo /usr/local/share/foundry/terminfo/xterm-ghostty.terminfo
+      when: foundry_xterm_ghostty_source.changed or not foundry_xterm_ghostty_terminfo.stat.exists
 
     - name: Ensure human user groups exist
       ansible.builtin.group:
