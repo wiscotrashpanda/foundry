@@ -41,8 +41,8 @@ ansible-playbook playbooks/connectivity.yml
 ## User Configuration
 
 Configure the human users, passwordless sudo, SSH access from
-`~/.ssh/foundry.pub`, their home-directory `code` folders, zsh, and Oh My Zsh
-after bootstrap:
+`~/.ssh/foundry.pub`, their home-directory `code` folders, shared
+`xterm-ghostty` terminfo, zsh, and Oh My Zsh after bootstrap:
 
 ```sh
 cd ansible
