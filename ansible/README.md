@@ -4,6 +4,33 @@ This directory contains the Ansible configuration for the local Ubuntu server
 named `foundry`. The inventory target `foundry` connects through your local SSH
 host alias `foundry-admin`, which logs in as the provisioning `ansible` user.
 
+## Manual Server Prerequisites
+
+Complete these one-time steps directly on the server before running the Ansible
+playbooks.
+
+Prevent the server from suspending when the laptop lid is shut by updating
+`/etc/systemd/logind.conf`:
+
+```ini
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+```
+
+Then restart `systemd-logind` or reboot the server so the setting takes effect.
+
+Create the `admin-sudo` group, allow that group to use passwordless sudo, and
+add the provisioning `ansible` user to it:
+
+```sh
+sudo groupadd --force admin-sudo
+sudo usermod -aG admin-sudo ansible
+printf '%%admin-sudo ALL=(ALL) NOPASSWD:ALL\n' | sudo tee /etc/sudoers.d/admin-sudo
+sudo chmod 0440 /etc/sudoers.d/admin-sudo
+sudo visudo -cf /etc/sudoers.d/admin-sudo
+```
+
 ## Connectivity Check
 
 Run Ansible from this directory so it picks up the repo-local
