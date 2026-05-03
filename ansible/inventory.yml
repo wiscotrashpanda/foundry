@@ -1,17 +1,9 @@
 ---
 all:
   children:
-    bootstrap:
-      hosts:
-        foundry_bootstrap:
-          ansible_host: foundry
-          ansible_connection: ssh
-          ansible_user: josh
-          ansible_python_interpreter: /usr/bin/python3
     ubuntu:
       hosts:
         foundry:
-          ansible_host: foundry
+          ansible_host: foundry-admin
           ansible_connection: ssh
-          ansible_user: ansible
           ansible_python_interpreter: /usr/bin/python3

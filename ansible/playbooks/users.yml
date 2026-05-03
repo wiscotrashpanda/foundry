@@ -7,7 +7,8 @@
   vars:
     foundry_users:
       - josh
-      - josh-pc
+      - powerchord
+    foundry_passwordless_sudo_group: admin-sudo
     foundry_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
     foundry_user_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
 
@@ -71,6 +72,11 @@
         state: present
       loop: "{{ foundry_users }}"
 
+    - name: Ensure passwordless sudo group exists
+      ansible.builtin.group:
+        name: "{{ foundry_passwordless_sudo_group }}"
+        state: present
+
     - name: Ensure human users exist
       ansible.builtin.user:
         name: "{{ item }}"
@@ -78,18 +84,14 @@
         shell: /bin/zsh
         create_home: true
         groups:
-          - sudo
+          - "{{ foundry_passwordless_sudo_group }}"
         append: true
       loop: "{{ foundry_users }}"
 
-    - name: Allow passwordless sudo for human users
-      ansible.builtin.copy:
+    - name: Remove legacy per-user passwordless sudo grants
+      ansible.builtin.file:
         dest: "/etc/sudoers.d/{{ item }}"
-        content: "{{ item }} ALL=(ALL) NOPASSWD:ALL\n"
-        owner: root
-        group: root
-        mode: "0440"
-        validate: /usr/sbin/visudo -cf %s
+        state: absent
       loop: "{{ foundry_users }}"
 
     - name: Ensure user code directories exist
@@ -120,34 +122,6 @@
         mode: "0600"
       loop: "{{ foundry_users }}"
 
-    - name: Ensure default zsh config exists
-      ansible.builtin.copy:
-        dest: "/home/{{ item }}/.zshrc"
-        content: |
-          # Created by Ansible to initialize zsh for this account.
-          HISTFILE=~/.zsh_history
-          HISTSIZE=10000
-          SAVEHIST=10000
-
-          autoload -Uz compinit
-          compinit
-        owner: "{{ item }}"
-        group: "{{ item }}"
-        mode: "0644"
-        force: false
-      loop: "{{ foundry_users }}"
-
-    - name: Alias ls to eza for human users
-      ansible.builtin.blockinfile:
-        path: "/home/{{ item }}/.zshrc"
-        marker: "# {mark} ANSIBLE MANAGED EZA ALIASES"
-        block: |
-          alias ls="eza"
-        owner: "{{ item }}"
-        group: "{{ item }}"
-        mode: "0644"
-      loop: "{{ foundry_users }}"
-
     - name: Install Oh My Zsh for human users
       ansible.builtin.git:
         repo: "{{ foundry_oh_my_zsh_repo }}"
@@ -168,17 +142,41 @@
       failed_when: false
       loop: "{{ foundry_users }}"
 
-    - name: Enable Oh My Zsh in zsh configs
-      ansible.builtin.blockinfile:
-        path: "/home/{{ item.item }}/.zshrc"
-        marker: "# {mark} ANSIBLE MANAGED OH MY ZSH"
-        block: |
-          export ZSH="$HOME/.oh-my-zsh"
-          ZSH_THEME="robbyrussell"
-          plugins=(git)
-          source "$ZSH/oh-my-zsh.sh"
+    - name: Back up existing zsh configs before Oh My Zsh initialization
+      ansible.builtin.shell:
+        cmd: |
+          set -eu
+          if [ -f "$HOME/.zshrc" ] && [ ! -f "$HOME/.zshrc.pre-oh-my-zsh" ]; then
+            cp "$HOME/.zshrc" "$HOME/.zshrc.pre-oh-my-zsh"
+            echo changed
+          fi
+      become_user: "{{ item.item }}"
+      environment:
+        HOME: "/home/{{ item.item }}"
+      register: foundry_oh_my_zsh_backup
+      changed_when: "'changed' in foundry_oh_my_zsh_backup.stdout"
+      when: item.rc != 0
+      loop: "{{ foundry_oh_my_zsh_config.results }}"
+
+    - name: Initialize zsh configs from the Oh My Zsh template
+      ansible.builtin.copy:
+        src: "/home/{{ item.item }}/.oh-my-zsh/templates/zshrc.zsh-template"
+        dest: "/home/{{ item.item }}/.zshrc"
         owner: "{{ item.item }}"
         group: "{{ item.item }}"
         mode: "0644"
+        remote_src: true
+        force: true
       when: item.rc != 0
+      loop: "{{ foundry_oh_my_zsh_config.results }}"
+
+    - name: Alias ls to eza for human users
+      ansible.builtin.blockinfile:
+        path: "/home/{{ item.item }}/.zshrc"
+        marker: "# {mark} ANSIBLE MANAGED EZA ALIASES"
+        block: |
+          alias ls="eza"
+        owner: "{{ item.item }}"
+        group: "{{ item.item }}"
+        mode: "0644"
       loop: "{{ foundry_oh_my_zsh_config.results }}"
