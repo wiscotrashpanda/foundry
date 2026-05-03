@@ -21,6 +21,24 @@ cd ansible
 ansible-playbook playbooks/connectivity.yml
 ```
 
+## External Storage
+
+Authorize the G-Technology G-DRIVE Thunderbolt device, mount its ext4
+filesystem at `/mnt/store`, persist the mount in `/etc/fstab`, and prepare the
+Plex directories used by `docker/plex-media-server.yml`:
+
+```sh
+cd ansible
+ansible-playbook playbooks/storage.yml
+```
+
+The playbook enrolls Thunderbolt device
+`cd010000-0080-7518-a3c0-2d8c0a218202` with `boltd` and mounts filesystem UUID
+`c072b758-e4e4-44ea-8251-ef0891930805`.
+
+If `host_vars/foundry/vault.yml` exists, include `--ask-vault-pass` when using
+the normal inventory so Ansible can load the encrypted host variables.
+
 ## User Configuration
 
 Configure the human users, membership in the `admin-sudo` passwordless sudo
