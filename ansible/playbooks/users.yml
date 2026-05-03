@@ -1,0 +1,144 @@
+---
+- name: Configure human users
+  hosts: foundry
+  gather_facts: false
+  become: true
+
+  vars:
+    foundry_users:
+      - josh
+      - josh-pc
+    foundry_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
+    foundry_user_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
+
+  pre_tasks:
+    - name: Check for the local foundry public key
+      ansible.builtin.stat:
+        path: "{{ foundry_user_public_key_file }}"
+      register: foundry_user_public_key
+      delegate_to: localhost
+      become: false
+
+    - name: Require the local foundry public key
+      ansible.builtin.fail:
+        msg: >-
+          Expected {{ foundry_user_public_key_file }} on the Ansible controller.
+          Create that public key before running this playbook.
+      when: not foundry_user_public_key.stat.exists
+
+  tasks:
+    - name: Ensure user shell packages exist
+      ansible.builtin.apt:
+        name:
+          - git
+          - zsh
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure human user groups exist
+      ansible.builtin.group:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ foundry_users }}"
+
+    - name: Ensure human users exist
+      ansible.builtin.user:
+        name: "{{ item }}"
+        group: "{{ item }}"
+        shell: /bin/zsh
+        create_home: true
+        groups:
+          - sudo
+        append: true
+      loop: "{{ foundry_users }}"
+
+    - name: Allow passwordless sudo for human users
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ item }}"
+        content: "{{ item }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+      loop: "{{ foundry_users }}"
+
+    - name: Ensure user code directories exist
+      ansible.builtin.file:
+        path: "/home/{{ item }}/code"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0755"
+      loop: "{{ foundry_users }}"
+
+    - name: Ensure user SSH directories exist
+      ansible.builtin.file:
+        path: "/home/{{ item }}/.ssh"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0700"
+      loop: "{{ foundry_users }}"
+
+    - name: Install foundry public key for human users
+      ansible.builtin.lineinfile:
+        path: "/home/{{ item }}/.ssh/authorized_keys"
+        line: "{{ lookup('file', foundry_user_public_key_file) }}"
+        create: true
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0600"
+      loop: "{{ foundry_users }}"
+
+    - name: Ensure default zsh config exists
+      ansible.builtin.copy:
+        dest: "/home/{{ item }}/.zshrc"
+        content: |
+          # Created by Ansible to initialize zsh for this account.
+          HISTFILE=~/.zsh_history
+          HISTSIZE=10000
+          SAVEHIST=10000
+
+          autoload -Uz compinit
+          compinit
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0644"
+        force: false
+      loop: "{{ foundry_users }}"
+
+    - name: Install Oh My Zsh for human users
+      ansible.builtin.git:
+        repo: "{{ foundry_oh_my_zsh_repo }}"
+        dest: "/home/{{ item }}/.oh-my-zsh"
+        version: master
+        update: false
+        depth: 1
+      become_user: "{{ item }}"
+      environment:
+        HOME: "/home/{{ item }}"
+      loop: "{{ foundry_users }}"
+
+    - name: Check zsh configs for Oh My Zsh
+      ansible.builtin.command:
+        cmd: grep -Eq '(^|[[:space:]])source .*(oh-my-zsh\.sh)|ZSH=.*/\.oh-my-zsh' "/home/{{ item }}/.zshrc"
+      register: foundry_oh_my_zsh_config
+      changed_when: false
+      failed_when: false
+      loop: "{{ foundry_users }}"
+
+    - name: Enable Oh My Zsh in zsh configs
+      ansible.builtin.blockinfile:
+        path: "/home/{{ item.item }}/.zshrc"
+        marker: "# {mark} ANSIBLE MANAGED OH MY ZSH"
+        block: |
+          export ZSH="$HOME/.oh-my-zsh"
+          ZSH_THEME="robbyrussell"
+          plugins=(git)
+          source "$ZSH/oh-my-zsh.sh"
+        owner: "{{ item.item }}"
+        group: "{{ item.item }}"
+        mode: "0644"
+      when: item.rc != 0
+      loop: "{{ foundry_oh_my_zsh_config.results }}"
