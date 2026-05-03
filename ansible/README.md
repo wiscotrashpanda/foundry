@@ -39,6 +39,21 @@ The playbook enrolls Thunderbolt device
 If `host_vars/foundry/vault.yml` exists, include `--ask-vault-pass` when using
 the normal inventory so Ansible can load the encrypted host variables.
 
+## Docker
+
+Install Docker Engine from Docker's official apt repository, enable the
+`docker` service, add existing human users to the `docker` group, and deploy
+the Plex Compose file to `/srv/docker/plex-media-server.yml`:
+
+```sh
+cd ansible
+ansible-playbook playbooks/docker.yml
+```
+
+The playbook installs `docker-ce`, `docker-ce-cli`, `containerd.io`,
+`docker-buildx-plugin`, and `docker-compose-plugin`. Users may need to start a
+new login session before their Docker group membership is active.
+
 ## User Configuration
 
 Configure the human users, membership in the `admin-sudo` passwordless sudo
