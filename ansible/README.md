@@ -42,7 +42,8 @@ ansible-playbook playbooks/connectivity.yml
 
 Configure the human users, passwordless sudo, SSH access from
 `~/.ssh/foundry.pub`, their home-directory `code` folders, shared
-`xterm-ghostty` terminfo, zsh, and Oh My Zsh after bootstrap:
+`xterm-ghostty` terminfo, zsh, Oh My Zsh, and an `ls` to `eza` alias after
+bootstrap:
 
 ```sh
 cd ansible
