@@ -6,23 +6,22 @@
 
   vars:
     bootstrap_ansible_user: ansible
-    bootstrap_ansible_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry_ansible.pub"
+    bootstrap_ansible_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/ansible.pub"
     bootstrap_ansible_sudo_group: sudo
 
   pre_tasks:
-    - name: Check for the local foundry_ansible public key
+    - name: Check for the local ansible public key
       ansible.builtin.stat:
         path: "{{ bootstrap_ansible_public_key_file }}"
       register: bootstrap_public_key
       delegate_to: localhost
       become: false
 
-    - name: Require the local foundry_ansible public key
+    - name: Require the local ansible public key
       ansible.builtin.fail:
         msg: >-
           Expected {{ bootstrap_ansible_public_key_file }} on the Ansible
-          controller. Create it from ~/.ssh/foundry_ansible or generate the key
-          before running this playbook.
+          controller. Create that public key before running this playbook.
       when: not bootstrap_public_key.stat.exists
 
   tasks:
@@ -43,7 +42,7 @@
         group: "{{ bootstrap_ansible_user }}"
         mode: "0700"
 
-    - name: Install the foundry_ansible public key
+    - name: Install the ansible public key
       ansible.builtin.lineinfile:
         path: "/home/{{ bootstrap_ansible_user }}/.ssh/authorized_keys"
         line: "{{ lookup('file', bootstrap_ansible_public_key_file) }}"
