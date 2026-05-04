@@ -24,6 +24,85 @@
       Set TAILSCALE_AUTHKEY or provide vault_tailscale_authkey in
       {{ foundry_tailscale_vault_file }}.
 
+- name: Normalize Tailscale route and argument inputs
+  ansible.builtin.set_fact:
+    foundry_tailscale_advertise_routes_normalized: >-
+      {{
+        ([foundry_tailscale_advertise_routes]
+          if foundry_tailscale_advertise_routes is string
+          else foundry_tailscale_advertise_routes)
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+    foundry_tailscale_extra_args_normalized: >-
+      {{
+        ([foundry_tailscale_extra_args]
+          if foundry_tailscale_extra_args is string
+          else foundry_tailscale_extra_args)
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+
+- name: Validate Tailscale route and argument inputs
+  ansible.builtin.assert:
+    that:
+      - foundry_tailscale_advertise_routes_normalized | type_debug == 'list'
+      - foundry_tailscale_extra_args_normalized | type_debug == 'list'
+      - >-
+        not (
+          '--advertise-routes' in foundry_tailscale_args
+          and foundry_tailscale_advertise_routes_normalized | length > 0
+        )
+    fail_msg: >-
+      Set subnet routes in foundry_tailscale_advertise_routes, or put
+      --advertise-routes in foundry_tailscale_args, but do not use both.
+
+- name: Build Tailscale up arguments
+  ansible.builtin.set_fact:
+    foundry_tailscale_effective_args: >-
+      {{
+        (
+          [foundry_tailscale_args | trim]
+          + (
+            [
+              '--advertise-routes='
+              ~ (foundry_tailscale_advertise_routes_normalized | join(','))
+            ]
+            if foundry_tailscale_advertise_routes_normalized | length > 0
+            else []
+          )
+          + foundry_tailscale_extra_args_normalized
+        )
+        | reject('equalto', '')
+        | join(' ')
+      }}
+
+- name: Enable kernel forwarding for Tailscale subnet routing
+  ansible.builtin.copy:
+    dest: "{{ foundry_tailscale_subnet_routing_sysctl_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      net.ipv4.ip_forward = 1
+      net.ipv6.conf.all.forwarding = 1
+  register: foundry_tailscale_subnet_routing_sysctl
+  when:
+    - foundry_tailscale_manage_subnet_routing_sysctl | bool
+    - "'--advertise-routes' in foundry_tailscale_effective_args"
+
+- name: Apply kernel forwarding for Tailscale subnet routing
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - --system
+  changed_when: true
+  when:
+    - foundry_tailscale_subnet_routing_sysctl.changed
+    - not ansible_check_mode
+
 - name: Check whether Tailscale is already installed
   ansible.builtin.stat:
     path: "{{ foundry_tailscale_binary_path }}"
@@ -35,6 +114,6 @@
   vars:
     state: "{{ foundry_tailscale_state }}"
     tailscale_authkey: "{{ foundry_tailscale_authkey }}"
-    tailscale_args: "{{ foundry_tailscale_args }}"
+    tailscale_args: "{{ foundry_tailscale_effective_args }}"
     tailscale_manage_binaries_skip: >-
       {{ foundry_tailscale_state == 'present' and foundry_tailscale_binary.stat.exists }}
