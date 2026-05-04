@@ -4,3 +4,4 @@
 foundry_users: []
 foundry_user_full_name: Foundry User
 foundry_user_emails: {}
+foundry_tailscale_advertise_routes: []
