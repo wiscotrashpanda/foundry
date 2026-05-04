@@ -1,12 +1,47 @@
 # Ansible
 
 This directory contains the Ansible configuration for the local Ubuntu server
-named `foundry`. The inventory target `foundry` connects through your local SSH
-host alias `foundry-admin`, which logs in as the provisioning `ansible` user.
+named `foundry`. Run commands from this directory so the repo-local
+`ansible.cfg` is used.
+
+The steady-state inventory target `foundry` connects through the local SSH host
+alias `foundry-admin`, which should log in as the provisioning `ansible` user.
+
+## Layout
+
+```text
+ansible/
+  ansible.cfg
+  inventory.yml
+  group_vars/all.yml
+  foundry.yml
+  playbooks/
+  roles/
+  vault/
+```
+
+`playbooks/` contains the command entrypoints. `roles/` contains the reusable
+implementation. `vault/` contains encrypted secret files that are loaded only by
+the playbook that needs them, so ordinary inventory operations do not require a
+vault password.
+
+## Vault Password Helper
+
+`ansible.cfg` reads the vault password from `.vault-password`. This file is
+gitignored. If it fetches the password from 1Password, it must be executable and
+start with a shebang:
+
+```sh
+#!/bin/sh
+op read "op://<vault>/<item>/<field>"
+```
+
+If `.vault-password` contains the raw password instead, remove the executable
+bit so Ansible reads it as a plain password file.
 
 ## Manual Server Prerequisites
 
-Complete these one-time steps directly on the server before running the Ansible
+Complete these one-time steps directly on the server before running the normal
 playbooks.
 
 Prevent the server from suspending when the laptop lid is shut by updating
@@ -18,7 +53,7 @@ HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
 ```
 
-Then restart `systemd-logind` or reboot the server so the setting takes effect.
+Restart `systemd-logind` or reboot the server so the setting takes effect.
 
 Create the `admin-sudo` group, allow that group to use passwordless sudo, and
 add the provisioning `ansible` user to it:
@@ -31,112 +66,120 @@ sudo chmod 0440 /etc/sudoers.d/admin-sudo
 sudo visudo -cf /etc/sudoers.d/admin-sudo
 ```
 
-## Connectivity Check
+## Install Collections
 
-Run Ansible from this directory so it picks up the repo-local
-`ansible.cfg`:
-
-```sh
-cd ansible
-ansible foundry -m ansible.builtin.ping
-```
-
-The same check is also available as a playbook:
-
-```sh
-cd ansible
-ansible-playbook playbooks/connectivity.yml
-```
-
-## External Storage
-
-Authorize the G-Technology G-DRIVE Thunderbolt device, mount its ext4
-filesystem at `/mnt/store`, persist the mount in `/etc/fstab`, and prepare the
-Plex directories used by `docker/plex-media-server.yml`:
-
-```sh
-cd ansible
-ansible-playbook playbooks/storage.yml
-```
-
-The playbook enrolls Thunderbolt device
-`cd010000-0080-7518-a3c0-2d8c0a218202` with `boltd` and mounts filesystem UUID
-`c072b758-e4e4-44ea-8251-ef0891930805`.
-
-If `host_vars/foundry/vault.yml` exists, include `--ask-vault-pass` when using
-the normal inventory so Ansible can load the encrypted host variables.
-
-## Docker
-
-Install Docker Engine from Docker's official apt repository, enable the
-`docker` service, add existing human users to the `docker` group, and deploy
-the Plex Compose file to `/srv/docker/plex-media-server.yml`:
-
-```sh
-cd ansible
-ansible-playbook playbooks/docker.yml
-```
-
-The playbook installs `docker-ce`, `docker-ce-cli`, `containerd.io`,
-`docker-buildx-plugin`, and `docker-compose-plugin`. Users may need to start a
-new login session before their Docker group membership is active.
-
-## User Configuration
-
-Configure the human users, membership in the `admin-sudo` passwordless sudo
-group, SSH access from
-`~/.ssh/foundry.pub`, their home-directory `code` folders, shared
-`xterm-ghostty` terminfo, zsh, Oh My Zsh with its standard boilerplate
-`.zshrc`, and an `ls` to `eza` alias:
-
-```sh
-cd ansible
-ansible-playbook playbooks/users.yml
-```
-
-## Tailscale
-
-Install the Tailscale collection locally before the first run:
+Install required collections once:
 
 ```sh
 cd ansible
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Then install Tailscale, enable `tailscaled`, and add the server to your tailnet
-using an auth key from the controller environment:
+## Connectivity Check
+
+```sh
+cd ansible
+ansible foundry -m ansible.builtin.ping
+ansible-playbook playbooks/connectivity.yml
+```
+
+## Baseline Provisioning
+
+Run the normal baseline:
+
+```sh
+cd ansible
+ansible-playbook foundry.yml
+```
+
+`foundry.yml` imports the ordinary playbooks in order:
+
+1. `playbooks/connectivity.yml`
+2. `playbooks/terminfo.yml`
+3. `playbooks/tailscale.yml`
+4. `playbooks/users.yml`
+5. `playbooks/storage.yml`
+6. `playbooks/docker.yml`
+
+## Individual Playbooks
+
+```sh
+cd ansible
+ansible-playbook playbooks/terminfo.yml
+ansible-playbook playbooks/tailscale.yml
+ansible-playbook playbooks/users.yml
+ansible-playbook playbooks/storage.yml
+ansible-playbook playbooks/docker.yml
+```
+
+## User Configuration
+
+The `users` role manages:
+
+- human users from `foundry_users`
+- membership in the `admin-sudo` passwordless sudo group
+- SSH access from `~/.ssh/foundry.pub`
+- each user's `/home/<user>/code` directory
+- zsh, Oh My Zsh, `.zshrc`, and `.gitconfig`
+- shared `xterm-ghostty` terminfo through the `terminfo` role dependency
+
+User names and email addresses live in `group_vars/all.yml`.
+
+## External Storage
+
+The `storage` role authorizes the G-Technology G-DRIVE Thunderbolt device,
+mounts filesystem UUID `c072b758-e4e4-44ea-8251-ef0891930805` at `/mnt/store`,
+persists the mount in `/etc/fstab`, and prepares the Plex directories used by
+`docker/plex-media-server.yml`.
+
+## Docker
+
+The `docker` role installs Docker Engine from Docker's official apt repository,
+starts the `docker` service, adds existing human users to the `docker` group,
+and deploys the Plex Compose file to `/srv/docker/plex-media-server.yml`.
+
+Users may need to start a new login session before Docker group membership is
+active.
+
+## Tailscale
+
+One-shot with an environment variable:
 
 ```sh
 cd ansible
 TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook playbooks/tailscale.yml
 ```
 
-To store the key persistently, create an encrypted host vault:
+Persistent encrypted secret:
 
 ```sh
 cd ansible
-ansible-vault create host_vars/foundry/vault.yml
+ansible-vault create vault/foundry.yml
 ```
 
-Add this variable to the vault:
+Add this variable:
 
 ```yaml
 vault_tailscale_authkey: tskey-auth-...
 ```
 
-Then run with the vault password instead of exporting the key each time:
+Then run:
 
 ```sh
 cd ansible
-ansible-playbook playbooks/tailscale.yml --ask-vault-pass
+ansible-playbook playbooks/tailscale.yml
 ```
 
-The playbook uses `artis3n.tailscale.machine` and sets the Tailscale node name
-to `foundry`. To pass extra flags to `tailscale up`, set
-`foundry_tailscale_args`:
+To pass extra flags to `tailscale up`, override `foundry_tailscale_args`:
 
 ```sh
 cd ansible
-TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook playbooks/tailscale.yml \
+ansible-playbook playbooks/tailscale.yml \
   -e '{"foundry_tailscale_args":"--hostname=foundry --ssh"}'
 ```
+
+When `foundry_tailscale_state` is `present`, the local `tailscale` role skips
+package-manager work if `/usr/bin/tailscale` already exists. This avoids
+recurring apt cache refreshes on an already-enrolled host. Set
+`foundry_tailscale_state: latest` if you want a run to check for package
+updates.

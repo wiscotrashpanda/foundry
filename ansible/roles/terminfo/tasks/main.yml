@@ -1,0 +1,44 @@
+---
+- name: Ensure ncurses tic is available
+  ansible.builtin.apt:
+    name: ncurses-bin
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure shared terminfo source directory exists
+  ansible.builtin.file:
+    path: "{{ terminfo_source_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install terminfo sources
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ terminfo_source_dir }}/{{ item.src }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ terminfo_entries }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: terminfo_sources
+
+- name: Check whether terminfo entries are already compiled
+  ansible.builtin.stat:
+    path: "{{ terminfo_system_dir }}/{{ item.compiled_path }}"
+  loop: "{{ terminfo_entries }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: terminfo_compiled
+
+- name: Compile terminfo entries
+  ansible.builtin.command:
+    cmd: "tic -x -o {{ terminfo_system_dir }} {{ terminfo_source_dir }}/{{ item.0.src }}"
+  loop: "{{ terminfo_entries | zip(terminfo_compiled.results, terminfo_sources.results) | list }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+  when: item.2.changed or not item.1.stat.exists
+  changed_when: true

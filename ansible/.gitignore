@@ -1,3 +1,4 @@
 .tmp/
 collections/
 *.passwd
+.vault-password

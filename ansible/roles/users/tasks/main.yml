@@ -1,0 +1,127 @@
+---
+- name: Check for the local foundry public key
+  ansible.builtin.stat:
+    path: "{{ users_public_key_file }}"
+  register: users_public_key_stat
+  delegate_to: localhost
+  become: false
+
+- name: Require the local foundry public key
+  ansible.builtin.fail:
+    msg: >-
+      Expected {{ users_public_key_file }} on the Ansible controller.
+      Create that public key before running this role.
+  when: not users_public_key_stat.stat.exists
+
+- name: Ensure user shell packages exist
+  ansible.builtin.apt:
+    name:
+      - eza
+      - git
+      - zsh
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure human user groups exist
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ foundry_users }}"
+
+- name: Ensure human users exist
+  ansible.builtin.user:
+    name: "{{ item }}"
+    group: "{{ item }}"
+    shell: /bin/zsh
+    create_home: true
+    groups:
+      - "{{ users_passwordless_sudo_group }}"
+    append: true
+  loop: "{{ foundry_users }}"
+
+- name: Remove legacy per-user passwordless sudo grants
+  ansible.builtin.file:
+    dest: "/etc/sudoers.d/{{ item }}"
+    state: absent
+  loop: "{{ foundry_users }}"
+
+- name: Ensure user code directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item }}/code"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0755"
+  loop: "{{ foundry_users }}"
+
+- name: Ensure user SSH directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.ssh"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ foundry_users }}"
+
+- name: Install foundry public key for human users
+  ansible.builtin.lineinfile:
+    path: "/home/{{ item }}/.ssh/authorized_keys"
+    line: "{{ lookup('file', users_public_key_file) }}"
+    create: true
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ foundry_users }}"
+
+- name: Render gitconfig for human users
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "/home/{{ item }}/.gitconfig"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0644"
+  loop: "{{ foundry_users }}"
+  vars:
+    users_current_full_name: "{{ foundry_user_full_name }}"
+    users_current_email: "{{ foundry_user_emails[item] }}"
+
+- name: Install Oh My Zsh for human users
+  ansible.builtin.git:
+    repo: "{{ users_oh_my_zsh_repo }}"
+    dest: "/home/{{ item }}/.oh-my-zsh"
+    version: "{{ users_oh_my_zsh_version }}"
+    update: false
+    depth: 1
+  become_user: "{{ item }}"
+  environment:
+    HOME: "/home/{{ item }}"
+  loop: "{{ foundry_users }}"
+
+- name: Back up pre-Ansible zshrc once
+  ansible.builtin.shell:
+    cmd: |
+      set -eu
+      if [ -f "$HOME/.zshrc" ] \
+        && [ ! -f "$HOME/.zshrc.pre-ansible" ] \
+        && ! grep -q 'Foundry-managed zsh config' "$HOME/.zshrc"; then
+        cp "$HOME/.zshrc" "$HOME/.zshrc.pre-ansible"
+        echo changed
+      fi
+  become_user: "{{ item }}"
+  environment:
+    HOME: "/home/{{ item }}"
+  register: users_zshrc_backup
+  changed_when: "'changed' in users_zshrc_backup.stdout"
+  loop: "{{ foundry_users }}"
+
+- name: Render zshrc for human users
+  ansible.builtin.template:
+    src: zshrc.j2
+    dest: "/home/{{ item }}/.zshrc"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0644"
+  loop: "{{ foundry_users }}"
+  vars:
+    users_current_user: "{{ item }}"
