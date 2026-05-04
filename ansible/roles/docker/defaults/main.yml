@@ -1,0 +1,29 @@
+---
+docker_apt_repo: https://download.docker.com/linux/ubuntu
+docker_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armhf
+  ppc64le: ppc64el
+docker_conflicting_packages:
+  - docker.io
+  - docker-doc
+  - docker-compose
+  - docker-compose-v2
+  - podman-docker
+  - containerd
+  - runc
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_compose_dir: /srv/docker
+# List of compose files to deploy from the repo's top-level docker/ directory
+# into docker_compose_dir. Paths are relative to the repo root.
+docker_compose_files:
+  - plex-media-server.yml
+# Repo root, used to resolve docker_compose_files. Defaults to two levels above
+# the inventory (ansible/.. -> repo root).
+docker_repo_root: "{{ inventory_dir }}/.."

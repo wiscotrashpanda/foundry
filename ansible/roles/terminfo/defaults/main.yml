@@ -1,0 +1,7 @@
+---
+terminfo_source_dir: /usr/local/share/foundry/terminfo
+terminfo_system_dir: /usr/share/terminfo
+terminfo_entries:
+  - name: xterm-ghostty
+    src: xterm-ghostty.terminfo
+    compiled_path: x/xterm-ghostty

@@ -1,0 +1,67 @@
+---
+- name: Ensure Thunderbolt authorization tooling exists
+  ansible.builtin.apt:
+    name: bolt
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure boltd is running
+  ansible.builtin.service:
+    name: bolt
+    state: started
+    enabled: true
+
+- name: Read G-DRIVE Thunderbolt enrollment
+  ansible.builtin.command:
+    cmd: "boltctl info {{ storage_thunderbolt_uuid }}"
+  register: storage_bolt_info
+  changed_when: false
+
+- name: Enroll G-DRIVE Thunderbolt device for automatic authorization
+  ansible.builtin.command:
+    cmd: "boltctl enroll {{ storage_thunderbolt_uuid }}"
+  when: "'stored:        no' in storage_bolt_info.stdout"
+
+- name: Wait for the G-DRIVE filesystem UUID
+  ansible.builtin.command:
+    cmd: "blkid -U {{ storage_device_uuid }}"
+  register: storage_blkid
+  changed_when: false
+  retries: 10
+  delay: 1
+  until: storage_blkid.rc == 0
+
+- name: Ensure G-DRIVE mount point exists
+  ansible.builtin.file:
+    path: "{{ storage_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mount G-DRIVE and persist it in fstab
+  ansible.posix.mount:
+    path: "{{ storage_mount_point }}"
+    src: "UUID={{ storage_device_uuid }}"
+    fstype: "{{ storage_fstype }}"
+    opts: "{{ storage_mount_opts }}"
+    dump: "0"
+    passno: "2"
+    state: mounted
+
+- name: Ensure Plex media directory exists on G-DRIVE
+  ansible.builtin.file:
+    path: "{{ storage_plex_dir }}"
+    state: directory
+    owner: "{{ storage_plex_uid }}"
+    group: "{{ storage_plex_gid }}"
+    mode: "0755"
+
+- name: Ensure Plex config directory exists on G-DRIVE
+  ansible.builtin.file:
+    path: "{{ storage_plex_config_dir }}"
+    state: directory
+    owner: "{{ storage_plex_uid }}"
+    group: "{{ storage_plex_gid }}"
+    mode: "0755"
