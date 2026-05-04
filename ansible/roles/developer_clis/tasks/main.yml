@@ -5,90 +5,29 @@
       - ansible_facts["distribution"] == "Ubuntu"
     fail_msg: "The developer_clis role is written for Ubuntu hosts."
 
-- name: Ensure developer CLI apt prerequisites are current
-  ansible.builtin.apt:
-    name: "{{ developer_clis_prerequisite_packages }}"
-    state: "{{ developer_clis_apt_package_state }}"
-    update_cache: true
-    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
-    lock_timeout: 30
+- name: Set up apt prerequisites
+  ansible.builtin.import_tasks: apt-prereqs.yml
 
-- name: Ensure git is current
-  ansible.builtin.apt:
-    name: "{{ developer_clis_git_package }}"
-    state: "{{ developer_clis_apt_package_state }}"
-    update_cache: true
-    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
-    lock_timeout: 30
-
-- name: Ensure apt keyring directory exists
-  ansible.builtin.file:
-    path: /etc/apt/keyrings
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Install GitHub CLI apt keyring
-  ansible.builtin.get_url:
-    url: "{{ developer_clis_github_keyring_url }}"
-    dest: "{{ developer_clis_github_keyring_path }}"
-    checksum: "{{ developer_clis_github_keyring_checksum }}"
-    timeout: 30
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Add GitHub CLI apt repository
-  ansible.builtin.deb822_repository:
-    name: github-cli
-    types:
-      - deb
-    uris:
-      - "{{ developer_clis_github_apt_repo }}"
-    suites:
-      - stable
-    components:
-      - main
-    architectures:
-      - "{{ developer_clis_apt_arch_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
-    signed_by: "{{ developer_clis_github_keyring_path }}"
-    state: present
-  register: developer_clis_github_repo
-
-- name: Refresh apt cache after adding GitHub CLI repository
-  ansible.builtin.apt:
-    update_cache: true
-    lock_timeout: 30
-  when: developer_clis_github_repo.changed
-
-- name: Ensure GitHub CLI is current
-  ansible.builtin.apt:
-    name: "{{ developer_clis_gh_package }}"
-    state: "{{ developer_clis_apt_package_state }}"
-    update_cache: true
-    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
-    lock_timeout: 30
-
-- name: Resolve tea release architecture
-  ansible.builtin.set_fact:
-    developer_clis_tea_arch: "{{ developer_clis_tea_arch_map.get(ansible_facts['architecture'], '') }}"
-
-- name: Require supported tea architecture
-  ansible.builtin.assert:
-    that:
-      - developer_clis_tea_arch is defined
-      - developer_clis_tea_arch | length > 0
-    fail_msg: >-
-      No tea release architecture is mapped for
-      {{ ansible_facts['architecture'] }}.
+- name: Install GitHub CLI
+  ansible.builtin.import_tasks: github-cli.yml
 
 - name: Install Gitea tea CLI
-  ansible.builtin.get_url:
-    url: >-
-      {{ developer_clis_tea_release_base_url }}/v{{ developer_clis_tea_version }}/tea-{{ developer_clis_tea_version }}-linux-{{ developer_clis_tea_arch }}
-    dest: "{{ developer_clis_tea_install_path }}"
-    timeout: 30
-    owner: root
-    group: root
-    mode: "0755"
+  ansible.builtin.import_tasks: gitea-tea.yml
+
+- name: Install HashiCorp Terraform
+  ansible.builtin.import_tasks: terraform.yml
+
+- name: Install AWS CLI v2
+  ansible.builtin.import_tasks: aws-cli.yml
+
+- name: Install Google Cloud CLI
+  ansible.builtin.import_tasks: gcloud.yml
+
+- name: Install Node.js (NodeSource)
+  ansible.builtin.import_tasks: nodejs.yml
+
+- name: Install npm-managed CLIs
+  ansible.builtin.import_tasks: npm-globals.yml
+
+- name: Install opencode
+  ansible.builtin.import_tasks: opencode.yml

@@ -22,12 +22,32 @@ users_zsh_aliases:
 # hook). Useful for one-off env exports without forking the template.
 users_zsh_extra_lines: []
 
-# CLI configuration homes are created per-user so gh/tea auth state is never
-# shared between managed accounts. Auth tokens are intentionally left for each
-# user to add interactively with the CLI.
+# CLI configuration homes are created per-user so auth state is never shared
+# between managed accounts. Auth tokens are intentionally left for each user
+# to add interactively with the CLI (`gh auth login`, `gcloud auth login`,
+# `aws configure`, `tea login add`, etc.).
+#
+# `users_cli_config_dirs` are subdirectories under each user's `~/.config/`
+# (XDG-style tools).
 users_cli_config_dirs:
   - gh
   - tea
+  - gcloud
+  - opencode
+
+# `users_cli_home_dirs` are CLI homes that live directly under `~/` because
+# the tool does not honor XDG. Each entry is `{ path, mode }` where `path` is
+# relative to the user's home directory.
+users_cli_home_dirs:
+  - path: .aws
+    mode: "0700"
+  - path: .claude
+    mode: "0700"
+  - path: .codex
+    mode: "0700"
+  - path: .terraform.d
+    mode: "0700"
+
 users_gh_initial_config:
   git_protocol: ssh
   prompt: enabled

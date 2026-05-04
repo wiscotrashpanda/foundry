@@ -1,0 +1,41 @@
+---
+- name: Require Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+    fail_msg: "The apt_mirror role is written for Ubuntu hosts."
+
+- name: Require deb822 sources file
+  ansible.builtin.stat:
+    path: "{{ apt_mirror_sources_file }}"
+  register: apt_mirror_sources_stat
+
+- name: Fail if Ubuntu sources file is missing
+  ansible.builtin.fail:
+    msg: >-
+      Expected {{ apt_mirror_sources_file }} on the host. Modern Ubuntu
+      releases (24.04+) ship sources in deb822 format at this path; older
+      hosts use /etc/apt/sources.list and need a different role.
+  when: not apt_mirror_sources_stat.stat.exists
+
+- name: Pin Ubuntu archive mirror
+  ansible.builtin.replace:
+    path: "{{ apt_mirror_sources_file }}"
+    regexp: '(https?://)(?:[a-z]{2}\.)?archive\.ubuntu\.com'
+    replace: '\1{{ apt_mirror_archive_host }}'
+  register: apt_mirror_archive_result
+
+- name: Pin Ubuntu security mirror
+  ansible.builtin.replace:
+    path: "{{ apt_mirror_sources_file }}"
+    regexp: '(https?://)security\.ubuntu\.com'
+    replace: '\1{{ apt_mirror_security_host }}'
+  register: apt_mirror_security_result
+
+- name: Refresh apt cache after mirror change
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: 30
+  when:
+    - apt_mirror_refresh_cache
+    - apt_mirror_archive_result.changed or apt_mirror_security_result.changed

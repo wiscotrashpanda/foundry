@@ -1,10 +1,8 @@
 ---
-- name: Configure human users
+- name: Pin apt mirror to a fast regional host
   hosts: foundry
   gather_facts: true
   become: true
 
   roles:
     - role: apt_mirror
-    - role: developer_clis
-    - role: users
