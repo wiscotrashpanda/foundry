@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Foundry self-managed ansible-pull converge
+Documentation=file://{{ self_pull_checkout_dir }}/ansible/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ self_pull_wrapper_path }}
+# Journald captures stdout/stderr; keep it the default.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=5

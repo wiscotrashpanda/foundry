@@ -1,0 +1,8 @@
+---
+- name: Configure foundry self-managed ansible-pull
+  hosts: foundry
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: self_pull
