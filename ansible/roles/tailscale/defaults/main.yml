@@ -1,5 +1,10 @@
 ---
-foundry_tailscale_args: "--hostname={{ inventory_hostname }}"
+foundry_tailscale_hostname: "{{ inventory_hostname }}"
+foundry_tailscale_args: "--hostname={{ foundry_tailscale_hostname }}"
+foundry_tailscale_extra_args: []
+foundry_tailscale_advertise_routes: []
+foundry_tailscale_manage_subnet_routing_sysctl: true
+foundry_tailscale_subnet_routing_sysctl_path: /etc/sysctl.d/99-foundry-tailscale-subnet-routing.conf
 foundry_tailscale_state: present
 foundry_tailscale_vault_file: "{{ inventory_dir }}/vault/foundry.yml"
 foundry_tailscale_binary_path: /usr/bin/tailscale
