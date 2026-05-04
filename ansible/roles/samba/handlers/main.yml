@@ -1,0 +1,9 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart smbd
+  ansible.builtin.service:
+    name: "{{ samba_service_name }}"
+    state: restarted
