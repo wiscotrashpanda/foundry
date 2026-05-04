@@ -74,6 +74,17 @@
   loop_control:
     label: "/home/{{ item.0 }}/.config/{{ item.1 }}"
 
+- name: Ensure per-user CLI home directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item.0 }}/{{ item.1.path }}"
+    state: directory
+    owner: "{{ item.0 }}"
+    group: "{{ item.0 }}"
+    mode: "{{ item.1.mode }}"
+  loop: "{{ foundry_users | product(users_cli_home_dirs) | list }}"
+  loop_control:
+    label: "/home/{{ item.0 }}/{{ item.1.path }}"
+
 - name: Seed initial GitHub CLI config per user
   ansible.builtin.copy:
     dest: "/home/{{ item }}/.config/gh/config.yml"

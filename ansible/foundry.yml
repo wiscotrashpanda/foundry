@@ -1,5 +1,6 @@
 ---
 - import_playbook: playbooks/connectivity.yml
+- import_playbook: playbooks/apt-mirror.yml
 - import_playbook: playbooks/terminfo.yml
 - import_playbook: playbooks/tailscale.yml
 - import_playbook: playbooks/users.yml

@@ -1,0 +1,41 @@
+---
+- name: Install NodeSource apt keyring
+  ansible.builtin.get_url:
+    url: "{{ developer_clis_nodejs_keyring_url }}"
+    dest: "{{ developer_clis_nodejs_keyring_path }}"
+    checksum: "{{ developer_clis_nodejs_keyring_checksum or omit }}"
+    timeout: 30
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Add NodeSource apt repository
+  ansible.builtin.deb822_repository:
+    name: nodesource
+    types:
+      - deb
+    uris:
+      - "{{ developer_clis_nodejs_apt_repo }}"
+    suites:
+      - nodistro
+    components:
+      - main
+    architectures:
+      - "{{ developer_clis_apt_arch_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+    signed_by: "{{ developer_clis_nodejs_keyring_path }}"
+    state: present
+  register: developer_clis_nodejs_repo
+
+- name: Refresh apt cache after adding NodeSource repository
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: 30
+  when: developer_clis_nodejs_repo.changed
+
+- name: Ensure Node.js and npm are current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_nodejs_packages }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30

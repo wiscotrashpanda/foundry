@@ -1,8 +1,7 @@
 ---
-developer_clis_github_keyring_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
-developer_clis_github_keyring_checksum: sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
-developer_clis_github_keyring_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
-developer_clis_github_apt_repo: https://cli.github.com/packages
+# Shared apt settings.
+developer_clis_apt_package_state: latest
+developer_clis_apt_cache_valid_time: 3600
 developer_clis_apt_arch_map:
   x86_64: amd64
   aarch64: arm64
@@ -11,15 +10,84 @@ developer_clis_apt_arch_map:
 
 developer_clis_prerequisite_packages:
   - ca-certificates
+  - curl
+  - gnupg
   - python3-debian
-developer_clis_git_package: git
-developer_clis_gh_package: gh
-developer_clis_apt_package_state: latest
-developer_clis_apt_cache_valid_time: 3600
+  - unzip
 
+# Git is managed alongside the rest so users always get a current toolchain.
+developer_clis_git_package: git
+
+# GitHub CLI.
+developer_clis_github_keyring_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+developer_clis_github_keyring_checksum: sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+developer_clis_github_keyring_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+developer_clis_github_apt_repo: https://cli.github.com/packages
+developer_clis_gh_package: gh
+
+# Gitea tea CLI.
 developer_clis_tea_version: 0.14.0
 developer_clis_tea_release_base_url: https://gitea.com/gitea/tea/releases/download
 developer_clis_tea_install_path: /usr/local/bin/tea
 developer_clis_tea_arch_map:
   x86_64: amd64
+  aarch64: arm64
+
+# HashiCorp Terraform.
+# HashiCorp publishes Ubuntu suites named after each codename (jammy, noble,
+# plucky, ...) and lags behind brand-new Ubuntu releases. On a host whose
+# codename is not yet published, override `developer_clis_hashicorp_suite` to
+# the most recent published codename (e.g. `noble`) in group_vars/host_vars.
+developer_clis_hashicorp_keyring_url: https://apt.releases.hashicorp.com/gpg
+developer_clis_hashicorp_keyring_path: /etc/apt/keyrings/hashicorp-archive-keyring.asc
+developer_clis_hashicorp_keyring_checksum: ""
+developer_clis_hashicorp_apt_repo: https://apt.releases.hashicorp.com
+developer_clis_hashicorp_suite: "{{ ansible_facts['distribution_release'] }}"
+developer_clis_terraform_package: terraform
+
+# AWS CLI v2 - downloaded directly from AWS, version pulled from the upstream
+# GitHub release feed and re-installed only when the installed copy lags.
+# Use /releases?per_page=1 instead of /releases/latest because AWS often flags
+# their newest releases as prerelease, which makes /latest return 404.
+developer_clis_aws_cli_releases_url: https://api.github.com/repos/aws/aws-cli/releases?per_page=1
+developer_clis_aws_cli_zip_url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ ansible_facts['architecture'] }}.zip"
+developer_clis_aws_cli_install_dir: /usr/local/aws-cli
+developer_clis_aws_cli_bin_dir: /usr/local/bin
+
+# Google Cloud CLI.
+developer_clis_gcloud_keyring_url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+developer_clis_gcloud_keyring_path: /etc/apt/keyrings/cloud.google.asc
+developer_clis_gcloud_keyring_checksum: ""
+developer_clis_gcloud_apt_repo: https://packages.cloud.google.com/apt
+developer_clis_gcloud_packages:
+  - google-cloud-cli
+  - google-cloud-cli-gke-gcloud-auth-plugin
+
+# Node.js (NodeSource). Bump the major to move the system Node.
+# Note: on recent Ubuntu releases (24.04+) the distro repo also ships current
+# Node 22 LTS. apt may pick Ubuntu's nodejs over NodeSource's, in which case
+# `npm` must be installed as a separate package - hence the package list.
+developer_clis_nodejs_major: 22
+developer_clis_nodejs_keyring_url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+developer_clis_nodejs_keyring_path: /etc/apt/keyrings/nodesource.asc
+developer_clis_nodejs_keyring_checksum: ""
+developer_clis_nodejs_apt_repo: "https://deb.nodesource.com/node_{{ developer_clis_nodejs_major }}.x"
+developer_clis_nodejs_packages:
+  - nodejs
+  - npm
+
+# Globally-installed npm CLIs (Claude Code, OpenAI Codex). Tracked at @latest;
+# add or remove packages by editing this list.
+developer_clis_npm_global_packages:
+  - "@anthropic-ai/claude-code"
+  - "@openai/codex"
+
+# opencode (sst/opencode). Version is resolved from the GitHub releases feed
+# and the matching tarball is fetched dynamically.
+# See aws-cli note: /releases?per_page=1 is more resilient than /releases/latest
+# when upstream marks newer releases as prerelease.
+developer_clis_opencode_releases_url: https://api.github.com/repos/sst/opencode/releases?per_page=1
+developer_clis_opencode_install_path: /usr/local/bin/opencode
+developer_clis_opencode_arch_map:
+  x86_64: x64
   aarch64: arm64
