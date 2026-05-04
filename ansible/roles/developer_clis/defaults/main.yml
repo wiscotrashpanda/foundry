@@ -14,6 +14,8 @@ developer_clis_prerequisite_packages:
   - python3-debian
 developer_clis_git_package: git
 developer_clis_gh_package: gh
+developer_clis_apt_package_state: latest
+developer_clis_apt_cache_valid_time: 3600
 
 developer_clis_tea_version: 0.14.0
 developer_clis_tea_release_base_url: https://gitea.com/gitea/tea/releases/download

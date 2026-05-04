@@ -5,31 +5,21 @@
       - ansible_facts["distribution"] == "Ubuntu"
     fail_msg: "The developer_clis role is written for Ubuntu hosts."
 
-- name: Check developer CLI apt prerequisites
-  ansible.builtin.command:
-    cmd: "dpkg-query -W {{ developer_clis_prerequisite_packages | join(' ') }}"
-  register: developer_clis_prerequisite_check
-  changed_when: false
-  failed_when: false
+- name: Ensure developer CLI apt prerequisites are current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_prerequisite_packages }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30
 
-- name: Install missing developer CLI apt prerequisites
-  ansible.builtin.command:
-    cmd: >-
-      apt-get -o DPkg::Lock::Timeout=30 install -y
-      {{ developer_clis_prerequisite_packages | join(' ') }}
-  changed_when: true
-  when: developer_clis_prerequisite_check.rc != 0
-
-- name: Check whether git is installed
-  ansible.builtin.stat:
-    path: /usr/bin/git
-  register: developer_clis_git
-
-- name: Ensure git is installed
-  ansible.builtin.command:
-    cmd: "apt-get -o DPkg::Lock::Timeout=30 install -y {{ developer_clis_git_package }}"
-  changed_when: true
-  when: not developer_clis_git.stat.exists
+- name: Ensure git is current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_git_package }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30
 
 - name: Ensure apt keyring directory exists
   ansible.builtin.file:
@@ -66,28 +56,19 @@
     state: present
   register: developer_clis_github_repo
 
-- name: Check whether GitHub CLI is installed
-  ansible.builtin.stat:
-    path: /usr/bin/gh
-  register: developer_clis_gh
+- name: Refresh apt cache after adding GitHub CLI repository
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: 30
+  when: developer_clis_github_repo.changed
 
-- name: Refresh GitHub CLI apt cache when needed
-  ansible.builtin.command:
-    cmd: >-
-      apt-get update
-      -o Acquire::http::Timeout=30
-      -o Acquire::https::Timeout=30
-      -o Dir::Etc::sourcelist=sources.list.d/github-cli.sources
-      -o Dir::Etc::sourceparts=-
-      -o APT::Get::List-Cleanup=0
-  changed_when: true
-  when: not developer_clis_gh.stat.exists
-
-- name: Ensure GitHub CLI is installed
-  ansible.builtin.command:
-    cmd: "apt-get -o DPkg::Lock::Timeout=30 install -y {{ developer_clis_gh_package }}"
-  changed_when: true
-  when: not developer_clis_gh.stat.exists
+- name: Ensure GitHub CLI is current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_gh_package }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30
 
 - name: Resolve tea release architecture
   ansible.builtin.set_fact:
