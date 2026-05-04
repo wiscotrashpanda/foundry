@@ -1,0 +1,82 @@
+---
+- name: Resolve opencode architecture
+  ansible.builtin.set_fact:
+    developer_clis_opencode_arch: "{{ developer_clis_opencode_arch_map.get(ansible_facts['architecture'], '') }}"
+
+- name: Require supported opencode architecture
+  ansible.builtin.assert:
+    that:
+      - developer_clis_opencode_arch | length > 0
+    fail_msg: "No opencode architecture mapped for {{ ansible_facts['architecture'] }}."
+
+- name: Get latest opencode release
+  ansible.builtin.uri:
+    url: "{{ developer_clis_opencode_releases_url }}"
+    return_content: true
+  register: developer_clis_opencode_release
+  changed_when: false
+
+- name: Resolve latest opencode version
+  ansible.builtin.set_fact:
+    developer_clis_opencode_latest_version: "{{ developer_clis_opencode_release.json[0].tag_name | regex_replace('^v', '') }}"
+
+- name: Resolve opencode release asset URL
+  ansible.builtin.set_fact:
+    developer_clis_opencode_asset_url: >-
+      {{ (developer_clis_opencode_release.json[0].assets
+          | selectattr('name', 'match', '^opencode-linux-' ~ developer_clis_opencode_arch ~ '\.tar\.gz$')
+          | list
+          | first).browser_download_url }}
+
+- name: Check installed opencode version
+  ansible.builtin.command: opencode --version
+  register: developer_clis_opencode_installed
+  changed_when: false
+  failed_when: false
+
+- name: Resolve installed opencode version
+  ansible.builtin.set_fact:
+    developer_clis_opencode_installed_version: >-
+      {{ developer_clis_opencode_installed.stdout
+         | regex_search('[0-9]+\.[0-9]+\.[0-9]+')
+         | default('', true) }}
+
+- name: Install or update opencode
+  when: developer_clis_opencode_installed_version != developer_clis_opencode_latest_version
+  block:
+    - name: Create opencode staging directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: opencode
+      register: developer_clis_opencode_tmp
+
+    - name: Download opencode release archive
+      ansible.builtin.get_url:
+        url: "{{ developer_clis_opencode_asset_url }}"
+        dest: "{{ developer_clis_opencode_tmp.path }}/opencode.tar.gz"
+        timeout: 120
+        mode: "0644"
+
+    - name: Extract opencode binary
+      ansible.builtin.unarchive:
+        src: "{{ developer_clis_opencode_tmp.path }}/opencode.tar.gz"
+        dest: "{{ developer_clis_opencode_tmp.path }}"
+        remote_src: true
+
+    - name: Install opencode binary
+      ansible.builtin.copy:
+        src: "{{ developer_clis_opencode_tmp.path }}/opencode"
+        dest: "{{ developer_clis_opencode_install_path }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+  always:
+    - name: Clean up opencode staging directory
+      ansible.builtin.file:
+        path: "{{ developer_clis_opencode_tmp.path }}"
+        state: absent
+      when:
+        - developer_clis_opencode_tmp is defined
+        - developer_clis_opencode_tmp.path is defined

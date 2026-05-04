@@ -150,26 +150,47 @@ ansible-playbook playbooks/system-updates.yml -e system_updates_reboot=true
 Together they manage:
 
 - human users from `foundry_users`
-- `git`, GitHub CLI (`gh`), and Gitea CLI (`tea`) for those users
+- system-wide developer CLIs installed once per host (see below)
 - membership in the `admin-sudo` passwordless sudo group
 - SSH access from `~/.ssh/foundry.pub`
 - each user's `/home/<user>/code` directory
-- per-user CLI config homes under `/home/<user>/.config/gh` and
-  `/home/<user>/.config/tea`
+- per-user CLI config homes under `~/.config/{gh,tea,gcloud,opencode}` and
+  `~/{.aws,.claude,.codex,.terraform.d}`
 - zsh, Oh My Zsh, `.zshrc`, and `.gitconfig`
 - shared `xterm-ghostty` terminfo through the `terminfo` role dependency
 
-The `developer_clis` role installs and upgrades apt-managed developer packages
-like `git` and `gh` by default. Set `developer_clis_apt_package_state:
-present` to install missing packages without upgrading them. The `tea` CLI is
-installed from the pinned Gitea release binary named by
-`developer_clis_tea_version`; bump that version when you want a new `tea`
-release.
+### Developer CLIs
+
+The `developer_clis` role installs each tool once per host. Per-user state
+(auth tokens, project context, command history) lives under each user's home
+directory and is created by the `users` role. The role installs:
+
+- `git` and GitHub CLI (`gh`) — apt-managed
+- Gitea CLI (`tea`) — pinned binary from Gitea releases
+  (`developer_clis_tea_version`)
+- HashiCorp Terraform — apt-managed via HashiCorp's apt repo
+- AWS CLI v2 — installed from AWS's official zip, re-installed only when the
+  upstream GitHub release tag is newer than the local copy
+- Google Cloud CLI — apt-managed (`google-cloud-cli` plus
+  `google-cloud-cli-gke-gcloud-auth-plugin` for kubectl/GKE)
+- Node.js — apt-managed via NodeSource (`developer_clis_nodejs_major`
+  selects the major version)
+- Claude Code (`@anthropic-ai/claude-code`) and OpenAI Codex (`@openai/codex`)
+  — npm globals tracked at `@latest`
+- opencode (`sst/opencode`) — installed from the latest GitHub release tarball
+
+Apt-managed tools follow `developer_clis_apt_package_state` (default
+`latest`). Set it to `present` to install missing packages without upgrading
+existing ones. The npm globals always re-resolve `@latest`; bump
+`developer_clis_npm_global_packages` to add or remove packages. AWS CLI and
+opencode compare the installed version against the upstream release feed and
+only download when the host is behind.
 
 User names and email addresses live in the ignored
-`group_vars/all/99-private.yml` file. GitHub and Gitea auth tokens are not
-stored by Ansible; each user can run `gh auth login` and `tea login add` from
-their own account when credentials are available.
+`group_vars/all/99-private.yml` file. No auth tokens are stored by Ansible;
+each user runs `gh auth login`, `tea login add`, `aws configure`,
+`gcloud auth login`, `claude`, `codex`, `opencode auth`, etc. from their own
+account when credentials are available.
 
 ## External Storage
 

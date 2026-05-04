@@ -1,0 +1,65 @@
+---
+- name: Get latest AWS CLI v2 release tag
+  ansible.builtin.uri:
+    url: "{{ developer_clis_aws_cli_releases_url }}"
+    return_content: true
+  register: developer_clis_aws_cli_release
+  changed_when: false
+
+- name: Resolve latest AWS CLI v2 version
+  ansible.builtin.set_fact:
+    developer_clis_aws_cli_latest_version: "{{ developer_clis_aws_cli_release.json[0].tag_name | regex_replace('^v', '') }}"
+
+- name: Check installed AWS CLI version
+  ansible.builtin.command: aws --version
+  register: developer_clis_aws_cli_installed
+  changed_when: false
+  failed_when: false
+
+- name: Resolve installed AWS CLI version
+  ansible.builtin.set_fact:
+    developer_clis_aws_cli_installed_version: >-
+      {{ developer_clis_aws_cli_installed.stdout
+         | regex_search('aws-cli/[0-9.]+')
+         | default('', true)
+         | regex_replace('^aws-cli/', '') }}
+
+- name: Install or update AWS CLI v2
+  when: developer_clis_aws_cli_installed_version != developer_clis_aws_cli_latest_version
+  block:
+    - name: Create AWS CLI staging directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: aws-cli
+      register: developer_clis_aws_cli_tmp
+
+    - name: Download AWS CLI v2 zip
+      ansible.builtin.get_url:
+        url: "{{ developer_clis_aws_cli_zip_url }}"
+        dest: "{{ developer_clis_aws_cli_tmp.path }}/awscliv2.zip"
+        timeout: 120
+        mode: "0644"
+
+    - name: Extract AWS CLI v2 zip
+      ansible.builtin.unarchive:
+        src: "{{ developer_clis_aws_cli_tmp.path }}/awscliv2.zip"
+        dest: "{{ developer_clis_aws_cli_tmp.path }}"
+        remote_src: true
+
+    - name: Run AWS CLI v2 installer
+      ansible.builtin.command:
+        cmd: >-
+          {{ developer_clis_aws_cli_tmp.path }}/aws/install
+          --bin-dir {{ developer_clis_aws_cli_bin_dir }}
+          --install-dir {{ developer_clis_aws_cli_install_dir }}
+          {{ '--update' if developer_clis_aws_cli_installed_version | length > 0 else '' }}
+      changed_when: true
+
+  always:
+    - name: Clean up AWS CLI staging directory
+      ansible.builtin.file:
+        path: "{{ developer_clis_aws_cli_tmp.path }}"
+        state: absent
+      when:
+        - developer_clis_aws_cli_tmp is defined
+        - developer_clis_aws_cli_tmp.path is defined

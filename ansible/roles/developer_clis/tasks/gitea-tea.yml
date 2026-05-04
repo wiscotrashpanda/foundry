@@ -1,0 +1,23 @@
+---
+- name: Resolve tea release architecture
+  ansible.builtin.set_fact:
+    developer_clis_tea_arch: "{{ developer_clis_tea_arch_map.get(ansible_facts['architecture'], '') }}"
+
+- name: Require supported tea architecture
+  ansible.builtin.assert:
+    that:
+      - developer_clis_tea_arch is defined
+      - developer_clis_tea_arch | length > 0
+    fail_msg: >-
+      No tea release architecture is mapped for
+      {{ ansible_facts['architecture'] }}.
+
+- name: Install Gitea tea CLI
+  ansible.builtin.get_url:
+    url: >-
+      {{ developer_clis_tea_release_base_url }}/v{{ developer_clis_tea_version }}/tea-{{ developer_clis_tea_version }}-linux-{{ developer_clis_tea_arch }}
+    dest: "{{ developer_clis_tea_install_path }}"
+    timeout: 30
+    owner: root
+    group: root
+    mode: "0755"
