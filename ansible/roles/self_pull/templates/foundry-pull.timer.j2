@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Run foundry-pull on a schedule
+
+[Timer]
+OnBootSec={{ self_pull_timer_on_boot }}
+OnUnitActiveSec={{ self_pull_timer_on_active }}
+RandomizedDelaySec={{ self_pull_timer_randomized_delay }}
+Persistent=true
+Unit=foundry-pull.service
+
+[Install]
+WantedBy=timers.target

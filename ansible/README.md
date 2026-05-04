@@ -302,3 +302,103 @@ package-manager work if `/usr/bin/tailscale` already exists. This avoids
 recurring apt cache refreshes on an already-enrolled host. Set
 `foundry_tailscale_state: latest` if you want a run to check for package
 updates.
+
+## Self-Managed (ansible-pull)
+
+The `self_pull` role turns foundry into a self-managing host: a systemd timer
+runs `ansible-pull` hourly against this repo and applies the same `foundry.yml`
+that the Mac runs in push mode. Once it is set up, the Mac is no longer
+required for routine converges - push mode is preserved only for
+re-bootstrapping if foundry breaks badly.
+
+The role installs:
+
+- `/usr/local/bin/foundry-pull` - wrapper that fetches the repo, installs
+  Galaxy collections, and runs `ansible-pull` with the pull-mode inventory.
+- `/etc/systemd/system/foundry-pull.service` - oneshot unit that invokes the
+  wrapper.
+- `/etc/systemd/system/foundry-pull.timer` - 10 minutes after boot, then
+  hourly, with a 5-minute randomized delay.
+
+The wrapper expects two files that the role intentionally does **not**
+manage, because they hold secrets and require interactive setup:
+
+- `/etc/foundry/.vault-password` - vault password helper (mode `0700`,
+  owned by root). Either an executable shebang script that prints the
+  password, or a plain password file (mode `0400`).
+- `/etc/foundry/private.yml` - same content as the Mac's
+  `group_vars/all/99-private.yml` (mode `0600`, owned by root). Holds
+  `foundry_users`, `foundry_user_emails`, advertise routes, etc.
+
+### One-time bootstrap on foundry
+
+1. Install 1Password CLI (optional - skip to step 3 if you prefer a plain
+   password file). Add the 1Password apt repo, then:
+
+   ```sh
+   sudo apt install 1password-cli
+   ```
+
+   Authenticate non-interactively with a service account token. Either set
+   `OP_SERVICE_ACCOUNT_TOKEN` in the helper's environment, or run
+   `op signin` once and persist the session under `/root/.config/op/`.
+
+2. Write `/etc/foundry/.vault-password` as an executable shebang script:
+
+   ```sh
+   sudo install -d -m 0750 -o root -g root /etc/foundry
+   sudo tee /etc/foundry/.vault-password >/dev/null <<'EOF'
+   #!/bin/sh
+   exec op read "op://<vault>/<item>/<field>"
+   EOF
+   sudo chmod 0700 /etc/foundry/.vault-password
+   ```
+
+   **Fallback:** if 1Password CLI on a headless box is painful (no biometric
+   unlock; service-account-only mode is rate-limited), drop the script and
+   write the raw vault password to the same path with mode `0400`. The
+   wrapper does not care which form is used.
+
+3. Write `/etc/foundry/private.yml` with the same content as the Mac's
+   `group_vars/all/99-private.yml`:
+
+   ```sh
+   sudo install -m 0600 -o root -g root \
+     ~/group_vars-99-private.yml /etc/foundry/private.yml
+   ```
+
+4. From the Mac, run the converge one final time so the timer is installed:
+
+   ```sh
+   cd ansible
+   ansible-playbook foundry.yml
+   ```
+
+   Or just the self-pull bits:
+
+   ```sh
+   cd ansible
+   ansible-playbook playbooks/self-pull.yml
+   ```
+
+5. Confirm the timer is armed and trigger one manual run end-to-end:
+
+   ```sh
+   ssh foundry
+   sudo /usr/local/bin/foundry-pull
+   systemctl list-timers foundry-pull.timer
+   sudo systemctl start foundry-pull.service
+   journalctl -u foundry-pull.service -f
+   ```
+
+From then on the timer fires hourly. To verify pull mode is working
+end-to-end, push a trivial commit and either wait for the next firing or
+trigger `foundry-pull.service` manually - foundry should pick up and apply
+the change without any action from the Mac.
+
+### Pull-mode inventory
+
+`ansible/inventory-pull.yml` pins the host to `localhost` over the local
+connection plugin. The wrapper passes it explicitly, so push-mode
+`inventory.yml` (with `ansible_host: foundry-admin`) is left untouched and
+the Mac workflow keeps working.

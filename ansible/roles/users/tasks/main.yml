@@ -1,16 +1,17 @@
 ---
-- name: Check for the local foundry public key
+- name: Check for the foundry public key
   ansible.builtin.stat:
     path: "{{ users_public_key_file }}"
   register: users_public_key_stat
   delegate_to: localhost
   become: false
 
-- name: Require the local foundry public key
+- name: Require the foundry public key
   ansible.builtin.fail:
     msg: >-
-      Expected {{ users_public_key_file }} on the Ansible controller.
-      Create that public key before running this role.
+      Expected {{ users_public_key_file }} to exist on the controller.
+      In pull mode the controller is the foundry host and the file is
+      bundled in the repo; in push mode the path resolves on the Mac.
   when: not users_public_key_stat.stat.exists
 
 - name: Ensure user shell packages exist

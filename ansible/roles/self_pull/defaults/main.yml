@@ -1,0 +1,44 @@
+---
+# Repository the foundry host pulls its own configuration from.
+self_pull_repo_url: https://github.com/wiscotrashpanda/foundry.git
+self_pull_branch: main
+
+# Local checkout that ansible-pull manages. --purge cleans this between runs.
+self_pull_checkout_dir: /var/lib/foundry/repo
+
+# Path inside the checkout to the inventory used by ansible-pull, and to the
+# top-level playbook. Both are relative to the checkout directory.
+self_pull_inventory: ansible/inventory-pull.yml
+self_pull_playbook: ansible/foundry.yml
+
+# Files outside the repo that the wrapper passes to ansible-pull. The vault
+# helper is expected to be a shebang script that prints the vault password
+# (e.g. via 1Password's `op` CLI) - or a plain password file with mode 0400.
+# private.yml holds the same content as group_vars/all/99-private.yml on the
+# Mac (foundry_users, foundry_user_emails, advertise routes, etc).
+self_pull_vault_password_file: /etc/foundry/.vault-password
+self_pull_private_vars_file: /etc/foundry/private.yml
+
+# Where ansible-galaxy installs collections for the pull run. Kept under the
+# state dir so it survives across runs.
+self_pull_collections_dir: /var/lib/foundry/collections
+
+self_pull_state_dir: /var/lib/foundry
+self_pull_etc_dir: /etc/foundry
+self_pull_log_dir: /var/log/foundry
+
+# Wrapper installed for manual runs and used by the systemd unit.
+self_pull_wrapper_path: /usr/local/bin/foundry-pull
+
+# Timer schedule. OnBootSec gives the host time to settle on boot;
+# OnUnitActiveSec is the steady-state cadence. RandomizedDelaySec smears the
+# work across hosts if the schedule ever runs on more than one.
+self_pull_timer_on_boot: 10min
+self_pull_timer_on_active: 1h
+self_pull_timer_randomized_delay: 5min
+
+# Apt packages required on the target so ansible-pull can run there.
+self_pull_apt_packages:
+  - ansible-core
+  - git
+  - python3-passlib

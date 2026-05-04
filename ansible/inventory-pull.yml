@@ -1,0 +1,10 @@
+---
+# Inventory used by ansible-pull on the foundry host itself.
+# The target is localhost over the local connection, so no SSH is involved.
+all:
+  children:
+    ubuntu:
+      hosts:
+        foundry:
+          ansible_connection: local
+          ansible_python_interpreter: /usr/bin/python3
