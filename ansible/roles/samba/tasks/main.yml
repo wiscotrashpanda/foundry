@@ -1,0 +1,215 @@
+---
+- name: Ensure Samba packages exist
+  ansible.builtin.apt:
+    name: "{{ samba_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure Samba access group exists
+  ansible.builtin.group:
+    name: "{{ samba_group }}"
+    state: present
+
+- name: Check for optional Samba vault file
+  ansible.builtin.stat:
+    path: "{{ samba_vault_file }}"
+  register: samba_vault
+  delegate_to: localhost
+  become: false
+  when: samba_manage_passwords | bool
+
+- name: Load optional Samba vault variables
+  ansible.builtin.include_vars:
+    file: "{{ samba_vault_file }}"
+  no_log: true
+  when:
+    - samba_manage_passwords | bool
+    - samba_vault.stat.exists | default(false)
+
+- name: Check configured Samba users exist
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ item }}"
+  register: samba_user_checks
+  changed_when: false
+  failed_when: false
+  loop: "{{ samba_users }}"
+
+- name: Require configured Samba users to exist
+  ansible.builtin.fail:
+    msg: >-
+      Samba user {{ item.item }} does not exist. Add the user before enabling
+      SMB access, or remove it from samba_users.
+  when: item.rc != 0
+  loop: "{{ samba_user_checks.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Allow configured users to access Samba shares
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups:
+      - "{{ samba_group }}"
+    append: true
+  loop: "{{ samba_users }}"
+
+- name: Check required Samba share mount points
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --mountpoint
+      - "{{ item.required_mount }}"
+      - --evaluate
+      - --noheadings
+      - --output
+      - TARGET
+  register: samba_required_mounts
+  changed_when: false
+  failed_when: false
+  loop: "{{ samba_shares | selectattr('required_mount', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.required_mount }}"
+
+- name: Require Samba share storage to be mounted
+  ansible.builtin.fail:
+    msg: >-
+      {{ item.item.required_mount }} must be mounted before creating the
+      {{ item.item.name }} SMB share. Run playbooks/storage.yml first.
+  when: item.rc != 0
+  loop: "{{ samba_required_mounts.results }}"
+  loop_control:
+    label: "{{ item.item.required_mount }}"
+
+- name: Ensure Samba share directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default(samba_group) }}"
+    mode: "{{ item.mode | default('2775') }}"
+  loop: "{{ samba_shares }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Read Tailnet IPv4 address for Samba binding
+  ansible.builtin.command:
+    argv:
+      - "{{ samba_tailnet_binary_path }}"
+      - ip
+      - -4
+  register: samba_tailnet_ipv4
+  changed_when: false
+
+- name: Read Tailnet IPv6 address for Samba binding
+  ansible.builtin.command:
+    argv:
+      - "{{ samba_tailnet_binary_path }}"
+      - ip
+      - -6
+  register: samba_tailnet_ipv6
+  changed_when: false
+  failed_when: false
+  when: samba_tailnet_bind_ipv6 | bool
+
+- name: Build Samba bind interface list
+  ansible.builtin.set_fact:
+    samba_effective_interfaces: >-
+      {{
+        samba_interfaces
+        + [((samba_tailnet_ipv4.stdout | trim) ~ '/32')]
+        + ([((samba_tailnet_ipv6.stdout | trim) ~ '/128')]
+          if (samba_tailnet_bind_ipv6 | bool
+              and samba_tailnet_ipv6.rc == 0
+              and (samba_tailnet_ipv6.stdout | trim | length) > 0)
+          else [])
+      }}
+
+- name: Ensure smbd starts after Tailscale
+  ansible.builtin.file:
+    path: "{{ samba_systemd_override_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: samba_systemd_after_tailscale | bool
+
+- name: Configure smbd Tailscale startup ordering
+  ansible.builtin.copy:
+    dest: "{{ samba_systemd_override_dir }}/tailnet.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      Wants=tailscaled.service
+      After=tailscaled.service
+  notify:
+    - Reload systemd
+    - Restart smbd
+  when: samba_systemd_after_tailscale | bool
+
+- name: Render Samba configuration
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart smbd
+
+- name: Validate Samba configuration
+  ansible.builtin.command:
+    argv:
+      - testparm
+      - -s
+  changed_when: false
+
+- name: Require vault-provided Samba passwords to be usable
+  ansible.builtin.assert:
+    that:
+      - item.key in samba_users
+      - item.value | string | length > 0
+    fail_msg: >-
+      Each samba_user_passwords entry must match a user in samba_users and have
+      a non-empty password.
+  no_log: true
+  loop: "{{ samba_user_passwords | dict2items }}"
+  when: samba_manage_passwords | bool
+
+- name: Configure vault-provided Samba passwords
+  ansible.builtin.command:
+    argv:
+      - smbpasswd
+      - -s
+      - -a
+      - "{{ item.key }}"
+    stdin: "{{ item.value }}\n{{ item.value }}\n"
+  no_log: true
+  loop: "{{ samba_user_passwords | dict2items }}"
+  when: samba_manage_passwords | bool
+
+- name: Enable vault-provided Samba accounts
+  ansible.builtin.command:
+    argv:
+      - smbpasswd
+      - -e
+      - "{{ item.key }}"
+  no_log: true
+  loop: "{{ samba_user_passwords | dict2items }}"
+  when: samba_manage_passwords | bool
+
+- name: Ensure smbd is running
+  ansible.builtin.service:
+    name: "{{ samba_service_name }}"
+    state: started
+    enabled: true
+
+- name: Disable NetBIOS name service
+  ansible.builtin.service:
+    name: "{{ samba_nmbd_service_name }}"
+    state: stopped
+    enabled: false
+  when: not (samba_enable_nmbd | bool)
