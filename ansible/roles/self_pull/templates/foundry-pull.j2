@@ -44,13 +44,21 @@ ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR" \
     -r "$REPO_DIR/ansible/requirements.yml" \
     -p "$COLLECTIONS_DIR"
 
+# Point ansible at the in-repo ansible.cfg so roles_path (= roles, relative to
+# the cfg file) resolves to ansible/roles. Without this, ansible-pull runs
+# ansible-playbook from a cwd where the cfg is not auto-discovered, and roles
+# like apt_mirror are reported as missing.
+export ANSIBLE_CONFIG="$REPO_DIR/ansible/ansible.cfg"
 export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR"
 
+# --limit foundry overrides ansible-pull's default localhost limit so plays
+# targeting `hosts: foundry` actually run against the inventory host.
 exec ansible-pull \
   --url "$REPO_URL" \
   --checkout "$BRANCH" \
   --directory "$REPO_DIR" \
   --inventory "$INVENTORY" \
+  --limit foundry \
   --vault-password-file "$VAULT_PASSWORD_FILE" \
   --extra-vars "@$PRIVATE_VARS_FILE" \
   --purge \
