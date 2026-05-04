@@ -5,18 +5,35 @@
       - ansible_facts["os_family"] == "Debian"
     fail_msg: "The ansible-pull bootstrap role currently supports Debian/Ubuntu hosts."
 
-- name: Ensure apt can manage PPAs
+- name: Ensure apt prerequisites exist
   ansible.builtin.apt:
     name:
-      - software-properties-common
+      - ca-certificates
     state: present
     update_cache: true
     cache_valid_time: 3600
     lock_timeout: "{{ ansible_pull_apt_lock_timeout }}"
 
-- name: Enable the official Ansible PPA
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the official Ansible PPA signing key
+  ansible.builtin.get_url:
+    url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{{ ansible_pull_ppa_fingerprint }}"
+    dest: "{{ ansible_pull_ppa_keyring_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable the official Ansible PPA apt source
   ansible.builtin.apt_repository:
-    repo: ppa:ansible/ansible
+    repo: "deb [signed-by={{ ansible_pull_ppa_keyring_path }}] https://ppa.launchpadcontent.net/ansible/ansible/ubuntu {{ ansible_facts['distribution_release'] }} main"
+    filename: "{{ ansible_pull_ppa_source_file }}"
     state: present
     update_cache: false
   register: ansible_pull_ppa
