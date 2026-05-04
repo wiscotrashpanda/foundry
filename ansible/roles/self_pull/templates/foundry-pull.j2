@@ -1,0 +1,57 @@
+#!/bin/sh
+# {{ ansible_managed }}
+#
+# Wrapper that drives ansible-pull on the foundry host. Invoked manually for
+# ad-hoc converges and by foundry-pull.service on the systemd timer schedule.
+#
+# Pre-fetches the repo so requirements.yml is readable, installs collections
+# into a stable location, then hands off to ansible-pull. ansible-pull does
+# not install collections from requirements.yml on its own, and the tailscale
+# role needs artis3n.tailscale on the very first play - so doing this in the
+# wrapper avoids a chicken-and-egg failure.
+
+set -eu
+
+REPO_URL="{{ self_pull_repo_url }}"
+BRANCH="{{ self_pull_branch }}"
+REPO_DIR="{{ self_pull_checkout_dir }}"
+COLLECTIONS_DIR="{{ self_pull_collections_dir }}"
+INVENTORY="{{ self_pull_inventory }}"
+PLAYBOOK="{{ self_pull_playbook }}"
+VAULT_PASSWORD_FILE="{{ self_pull_vault_password_file }}"
+PRIVATE_VARS_FILE="{{ self_pull_private_vars_file }}"
+
+if [ ! -r "$VAULT_PASSWORD_FILE" ]; then
+  echo "foundry-pull: missing $VAULT_PASSWORD_FILE - see ansible/README.md bootstrap" >&2
+  exit 1
+fi
+
+if [ ! -r "$PRIVATE_VARS_FILE" ]; then
+  echo "foundry-pull: missing $PRIVATE_VARS_FILE - see ansible/README.md bootstrap" >&2
+  exit 1
+fi
+
+if [ -d "$REPO_DIR/.git" ]; then
+  git -C "$REPO_DIR" fetch --quiet origin "$BRANCH"
+  git -C "$REPO_DIR" reset --quiet --hard "origin/$BRANCH"
+else
+  mkdir -p "$(dirname "$REPO_DIR")"
+  git clone --quiet --branch "$BRANCH" "$REPO_URL" "$REPO_DIR"
+fi
+
+ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR" \
+  ansible-galaxy collection install \
+    -r "$REPO_DIR/ansible/requirements.yml" \
+    -p "$COLLECTIONS_DIR"
+
+export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR"
+
+exec ansible-pull \
+  --url "$REPO_URL" \
+  --checkout "$BRANCH" \
+  --directory "$REPO_DIR" \
+  --inventory "$INVENTORY" \
+  --vault-password-file "$VAULT_PASSWORD_FILE" \
+  --extra-vars "@$PRIVATE_VARS_FILE" \
+  --purge \
+  "$PLAYBOOK"
