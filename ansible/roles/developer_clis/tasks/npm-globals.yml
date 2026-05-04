@@ -1,0 +1,13 @@
+---
+- name: Ensure npm-managed global CLIs are current
+  ansible.builtin.command:
+    cmd: "npm install --global --no-fund --no-audit {{ item }}@latest"
+  register: developer_clis_npm_install
+  changed_when: >-
+    'added ' in developer_clis_npm_install.stdout
+    or 'changed ' in developer_clis_npm_install.stdout
+    or 'updated ' in developer_clis_npm_install.stdout
+    or 'removed ' in developer_clis_npm_install.stdout
+  loop: "{{ developer_clis_npm_global_packages }}"
+  loop_control:
+    label: "{{ item }}"

@@ -1,0 +1,18 @@
+---
+# Path to the deb822-format Ubuntu sources file managed by this role.
+apt_mirror_sources_file: /etc/apt/sources.list.d/ubuntu.sources
+
+# Replace `archive.ubuntu.com` with this hostname. `us.archive.ubuntu.com` is
+# round-robin across US-based mirrors. Override per-host or per-group to pin
+# to a specific country/region (e.g. `de.archive.ubuntu.com`,
+# `mirror.us.leaseweb.net`).
+apt_mirror_archive_host: us.archive.ubuntu.com
+
+# Replace `security.ubuntu.com` with this hostname. The default leaves the
+# security suite on Canonical's dedicated security mirror, which is generally
+# fast worldwide; override only if you have evidence it's slow for you.
+apt_mirror_security_host: security.ubuntu.com
+
+# Refresh the apt cache after rewriting the sources file. Disable if you want
+# to defer the cache refresh to a later task.
+apt_mirror_refresh_cache: true

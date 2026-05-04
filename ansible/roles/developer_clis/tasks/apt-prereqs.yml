@@ -1,0 +1,24 @@
+---
+- name: Ensure developer CLI apt prerequisites are current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_prerequisite_packages }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30
+
+- name: Ensure git is current
+  ansible.builtin.apt:
+    name: "{{ developer_clis_git_package }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30
+
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
