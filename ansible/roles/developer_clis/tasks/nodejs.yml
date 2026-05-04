@@ -26,13 +26,28 @@
     state: present
   register: developer_clis_nodejs_repo
 
+- name: Pin nodejs to NodeSource
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/nodesource.pref
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Package: nodejs
+      Pin: origin deb.nodesource.com
+      Pin-Priority: 1001
+  register: developer_clis_nodejs_pin
+
 - name: Refresh apt cache after adding NodeSource repository
   ansible.builtin.apt:
     update_cache: true
     lock_timeout: 30
-  when: developer_clis_nodejs_repo.changed
+  when: developer_clis_nodejs_repo.changed or developer_clis_nodejs_pin.changed
 
-- name: Ensure Node.js and npm are current
+# NodeSource's nodejs package bundles npm. Do NOT install Ubuntu's `npm`
+# package alongside it - the two conflict (Ubuntu's npm pulls a stale
+# nodejs:any that Conflicts with NodeSource's nodejs).
+- name: Ensure Node.js is current (npm is bundled)
   ansible.builtin.apt:
     name: "{{ developer_clis_nodejs_packages }}"
     state: "{{ developer_clis_apt_package_state }}"
