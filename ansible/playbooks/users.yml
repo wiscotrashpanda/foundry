@@ -5,9 +5,6 @@
   become: true
 
   vars:
-    foundry_users:
-      - josh
-      - powerchord
     foundry_passwordless_sudo_group: admin-sudo
     foundry_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
     foundry_user_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
