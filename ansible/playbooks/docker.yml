@@ -27,9 +27,6 @@
       - docker-compose-plugin
     foundry_docker_compose_dir: /srv/docker
     foundry_docker_plex_compose_file: plex-media-server.yml
-    foundry_docker_users:
-      - josh
-      - powerchord
 
   tasks:
     - name: Require Ubuntu
@@ -92,7 +89,7 @@
       register: foundry_docker_user_check
       changed_when: false
       failed_when: false
-      loop: "{{ foundry_docker_users }}"
+      loop: "{{ foundry_users }}"
 
     - name: Allow existing human users to manage Docker
       ansible.builtin.user:

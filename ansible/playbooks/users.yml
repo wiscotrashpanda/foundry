@@ -5,9 +5,6 @@
   become: true
 
   vars:
-    foundry_users:
-      - josh
-      - powerchord
     foundry_passwordless_sudo_group: admin-sudo
     foundry_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
     foundry_user_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
@@ -120,6 +117,18 @@
         owner: "{{ item }}"
         group: "{{ item }}"
         mode: "0600"
+      loop: "{{ foundry_users }}"
+
+    - name: Install global gitconfig for human users
+      ansible.builtin.copy:
+        dest: "/home/{{ item }}/.gitconfig"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: "0644"
+        content: |
+          [user]
+          	name = {{ foundry_user_full_name }}
+          	email = {{ foundry_user_emails[item] }}
       loop: "{{ foundry_users }}"
 
     - name: Install Oh My Zsh for human users
