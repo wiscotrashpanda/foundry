@@ -2,5 +2,6 @@
 foundry_tailscale_args: "--hostname={{ inventory_hostname }}"
 foundry_tailscale_state: present
 foundry_tailscale_vault_file: "{{ inventory_dir }}/vault/foundry.yml"
+foundry_tailscale_binary_path: /usr/bin/tailscale
 foundry_tailscale_authkey: >-
   {{ vault_tailscale_authkey | default(lookup('env', 'TAILSCALE_AUTHKEY'), true) }}
