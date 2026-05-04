@@ -1,8 +1,8 @@
 ---
-- name: Configure human users
+- name: Install shared terminfo
   hosts: foundry
   gather_facts: false
   become: true
 
   roles:
-    - role: users
+    - role: terminfo

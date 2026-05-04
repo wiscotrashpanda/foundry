@@ -1,0 +1,104 @@
+---
+- name: Ensure Thunderbolt authorization tooling exists
+  ansible.builtin.apt:
+    name: bolt
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure boltd is running
+  ansible.builtin.service:
+    name: bolt
+    state: started
+    enabled: true
+
+- name: Read G-DRIVE Thunderbolt enrollment
+  ansible.builtin.command:
+    cmd: "boltctl info {{ storage_thunderbolt_uuid }}"
+  register: storage_bolt_info
+  changed_when: false
+
+- name: Enroll G-DRIVE Thunderbolt device for automatic authorization
+  ansible.builtin.command:
+    cmd: "boltctl enroll {{ storage_thunderbolt_uuid }}"
+  when: "'stored:        no' in storage_bolt_info.stdout"
+
+- name: Wait for the G-DRIVE filesystem UUID
+  ansible.builtin.command:
+    cmd: "blkid -U {{ storage_device_uuid }}"
+  register: storage_blkid
+  changed_when: false
+  retries: 10
+  delay: 1
+  until: storage_blkid.rc == 0
+
+- name: Ensure G-DRIVE mount point exists
+  ansible.builtin.file:
+    path: "{{ storage_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Persist G-DRIVE mount in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^\\S+\\s+{{ storage_mount_point | regex_escape }}\\s+"
+    line: "{{ storage_fstab_entry }}"
+    state: present
+    create: false
+    backup: true
+  register: storage_fstab
+
+- name: Reload systemd after fstab changes
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: storage_fstab.changed
+
+- name: Check current G-DRIVE mount point
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --mountpoint
+      - "{{ storage_mount_point }}"
+      - --evaluate
+      - --noheadings
+      - --output
+      - SOURCE
+  register: storage_findmnt
+  changed_when: false
+  failed_when: storage_findmnt.rc not in [0, 1]
+  check_mode: false
+
+- name: Refuse to reuse a mount point with another device
+  ansible.builtin.fail:
+    msg: >-
+      {{ storage_mount_point }} is mounted from {{ storage_findmnt.stdout | trim }};
+      expected {{ storage_blkid.stdout | trim }}.
+  when:
+    - storage_findmnt.rc == 0
+    - storage_findmnt.stdout | trim != storage_blkid.stdout | trim
+
+- name: Mount G-DRIVE
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ storage_mount_point }}"
+  when: storage_findmnt.rc != 0
+  changed_when: true
+
+- name: Ensure Plex media directory exists on G-DRIVE
+  ansible.builtin.file:
+    path: "{{ storage_plex_dir }}"
+    state: directory
+    owner: "{{ storage_plex_uid }}"
+    group: "{{ storage_plex_gid }}"
+    mode: "0755"
+
+- name: Ensure Plex config directory exists on G-DRIVE
+  ansible.builtin.file:
+    path: "{{ storage_plex_config_dir }}"
+    state: directory
+    owner: "{{ storage_plex_uid }}"
+    group: "{{ storage_plex_gid }}"
+    mode: "0755"

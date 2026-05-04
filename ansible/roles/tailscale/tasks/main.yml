@@ -1,0 +1,40 @@
+---
+- name: Check for the optional Tailscale vault file
+  ansible.builtin.stat:
+    path: "{{ foundry_tailscale_vault_file }}"
+  register: foundry_tailscale_vault
+  delegate_to: localhost
+  become: false
+
+- name: Load Tailscale vault variables
+  ansible.builtin.include_vars:
+    file: "{{ foundry_tailscale_vault_file }}"
+  register: foundry_tailscale_vault_load
+  failed_when: false
+  no_log: true
+  when:
+    - foundry_tailscale_vault.stat.exists
+    - lookup('env', 'TAILSCALE_AUTHKEY') | trim | length == 0
+
+- name: Require an auth key
+  ansible.builtin.assert:
+    that:
+      - foundry_tailscale_authkey | trim | length > 0
+    fail_msg: >-
+      Set TAILSCALE_AUTHKEY or provide vault_tailscale_authkey in
+      {{ foundry_tailscale_vault_file }}.
+
+- name: Check whether Tailscale is already installed
+  ansible.builtin.stat:
+    path: "{{ foundry_tailscale_binary_path }}"
+  register: foundry_tailscale_binary
+
+- name: Apply the artis3n.tailscale.machine role
+  ansible.builtin.include_role:
+    name: artis3n.tailscale.machine
+  vars:
+    state: "{{ foundry_tailscale_state }}"
+    tailscale_authkey: "{{ foundry_tailscale_authkey }}"
+    tailscale_args: "{{ foundry_tailscale_args }}"
+    tailscale_manage_binaries_skip: >-
+      {{ foundry_tailscale_state == 'present' and foundry_tailscale_binary.stat.exists }}

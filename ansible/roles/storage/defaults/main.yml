@@ -1,0 +1,13 @@
+---
+storage_thunderbolt_uuid: cd010000-0080-7518-a3c0-2d8c0a218202
+storage_device_uuid: c072b758-e4e4-44ea-8251-ef0891930805
+storage_mount_point: /mnt/store
+storage_fstype: ext4
+storage_mount_opts: defaults,nofail,x-systemd.device-timeout=30s
+storage_mount_dump: "0"
+storage_mount_passno: "2"
+storage_fstab_entry: "UUID={{ storage_device_uuid }} {{ storage_mount_point }} {{ storage_fstype }} {{ storage_mount_opts }} {{ storage_mount_dump }} {{ storage_mount_passno }}"
+storage_plex_dir: "{{ storage_mount_point }}/plex"
+storage_plex_config_dir: "{{ storage_plex_dir }}/config"
+storage_plex_uid: "1000"
+storage_plex_gid: "1000"

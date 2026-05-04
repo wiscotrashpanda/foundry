@@ -4,14 +4,5 @@
   gather_facts: true
   become: true
 
-  vars:
-    foundry_tailscale_args: "--hostname=foundry"
-    foundry_tailscale_authkey: >-
-      {{ vault_tailscale_authkey | default(lookup('env', 'TAILSCALE_AUTHKEY'), true) }}
-
   roles:
-    - role: artis3n.tailscale.machine
-      vars:
-        state: present
-        tailscale_authkey: "{{ foundry_tailscale_authkey }}"
-        tailscale_args: "{{ foundry_tailscale_args }}"
+    - role: tailscale
