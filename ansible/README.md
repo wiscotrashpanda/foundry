@@ -120,6 +120,26 @@ ansible-playbook playbooks/tailscale.yml
 ansible-playbook playbooks/users.yml
 ansible-playbook playbooks/storage.yml
 ansible-playbook playbooks/docker.yml
+ansible-playbook playbooks/system-updates.yml
+```
+
+## System Updates
+
+Run package maintenance explicitly when you want the server to apply available
+Ubuntu package updates:
+
+```sh
+cd ansible
+ansible-playbook playbooks/system-updates.yml
+```
+
+The update playbook runs a safe apt upgrade, removes unused packages, cleans old
+package cache files, and reports whether the host needs a reboot. It does not
+reboot by default. To reboot automatically only when required:
+
+```sh
+cd ansible
+ansible-playbook playbooks/system-updates.yml -e system_updates_reboot=true
 ```
 
 ## User Configuration
@@ -137,9 +157,12 @@ Together they manage:
 - zsh, Oh My Zsh, `.zshrc`, and `.gitconfig`
 - shared `xterm-ghostty` terminfo through the `terminfo` role dependency
 
-The `developer_clis` role installs `gh` from GitHub's official apt repository
-and `tea` from the pinned Gitea release binary named by
-`developer_clis_tea_version`.
+The `developer_clis` role installs and upgrades apt-managed developer packages
+like `git` and `gh` by default. Set `developer_clis_apt_package_state:
+present` to install missing packages without upgrading them. The `tea` CLI is
+installed from the pinned Gitea release binary named by
+`developer_clis_tea_version`; bump that version when you want a new `tea`
+release.
 
 User names and email addresses live in the ignored
 `group_vars/all/99-private.yml` file. GitHub and Gitea auth tokens are not

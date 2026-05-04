@@ -1,0 +1,52 @@
+---
+- name: Apply Foundry system package updates
+  hosts: foundry
+  become: true
+  vars:
+    system_updates_apt_cache_valid_time: 3600
+    system_updates_upgrade_mode: safe
+    system_updates_autoremove: true
+    system_updates_purge_autoremoved: false
+    system_updates_autoclean: true
+    system_updates_reboot: false
+  tasks:
+    - name: Upgrade apt packages
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: "{{ system_updates_apt_cache_valid_time }}"
+        upgrade: "{{ system_updates_upgrade_mode }}"
+        lock_timeout: 30
+
+    - name: Remove unused apt packages
+      ansible.builtin.apt:
+        autoremove: true
+        purge: "{{ system_updates_purge_autoremoved }}"
+        lock_timeout: 30
+      when: system_updates_autoremove | bool
+
+    - name: Clean obsolete apt package cache files
+      ansible.builtin.apt:
+        autoclean: true
+        lock_timeout: 30
+      when: system_updates_autoclean | bool
+
+    - name: Check whether a reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: system_updates_reboot_required
+
+    - name: Report reboot status
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'Reboot required after package updates.'
+            if system_updates_reboot_required.stat.exists
+            else 'No reboot required after package updates.'
+          }}
+
+    - name: Reboot when explicitly requested and required
+      ansible.builtin.reboot:
+        msg: "Rebooting after Foundry system package updates"
+      when:
+        - system_updates_reboot | bool
+        - system_updates_reboot_required.stat.exists
