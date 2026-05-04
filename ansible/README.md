@@ -94,22 +94,22 @@ ansible-playbook foundry.yml
 
 `foundry.yml` imports the ordinary playbooks in order:
 
-1. `playbooks/users.yml`
-2. `playbooks/storage.yml`
-3. `playbooks/docker.yml`
-
-Tailscale is not part of the baseline because enrollment needs an auth key.
-Run it explicitly when you want to enroll or refresh Tailscale.
+1. `playbooks/connectivity.yml`
+2. `playbooks/terminfo.yml`
+3. `playbooks/tailscale.yml`
+4. `playbooks/users.yml`
+5. `playbooks/storage.yml`
+6. `playbooks/docker.yml`
 
 ## Individual Playbooks
 
 ```sh
 cd ansible
 ansible-playbook playbooks/terminfo.yml
+ansible-playbook playbooks/tailscale.yml
 ansible-playbook playbooks/users.yml
 ansible-playbook playbooks/storage.yml
 ansible-playbook playbooks/docker.yml
-ansible-playbook playbooks/tailscale.yml
 ```
 
 ## User Configuration
@@ -167,7 +167,7 @@ Then run:
 
 ```sh
 cd ansible
-ansible-playbook playbooks/tailscale.yml --ask-vault-pass
+ansible-playbook playbooks/tailscale.yml
 ```
 
 To pass extra flags to `tailscale up`, override `foundry_tailscale_args`:
@@ -177,3 +177,9 @@ cd ansible
 ansible-playbook playbooks/tailscale.yml \
   -e '{"foundry_tailscale_args":"--hostname=foundry --ssh"}'
 ```
+
+When `foundry_tailscale_state` is `present`, the local `tailscale` role skips
+package-manager work if `/usr/bin/tailscale` already exists. This avoids
+recurring apt cache refreshes on an already-enrolled host. Set
+`foundry_tailscale_state: latest` if you want a run to check for package
+updates.
