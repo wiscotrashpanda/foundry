@@ -1,0 +1,105 @@
+---
+- name: Require an apt-based Linux host
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+    fail_msg: "The ansible-pull bootstrap role currently supports Debian/Ubuntu hosts."
+
+- name: Ensure apt can manage PPAs
+  ansible.builtin.apt:
+    name:
+      - software-properties-common
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable the official Ansible PPA
+  ansible.builtin.apt_repository:
+    repo: ppa:ansible/ansible
+    state: present
+    update_cache: true
+
+- name: Install Ansible and ansible-pull dependencies
+  ansible.builtin.apt:
+    name:
+      - ansible
+      - git
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure Ansible configuration directory exists
+  ansible.builtin.file:
+    path: /etc/ansible
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the vault password file if it is missing
+  ansible.builtin.copy:
+    dest: "{{ ansible_pull_vault_password_file }}"
+    content: ""
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+
+- name: Enforce vault password file ownership and permissions
+  ansible.builtin.file:
+    path: "{{ ansible_pull_vault_password_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+    state: file
+
+- name: Configure system Ansible defaults
+  ansible.builtin.template:
+    src: ansible.cfg.j2
+    dest: "{{ ansible_pull_config_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ensure ansible-pull checkout directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_pull_checkout_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the foundry-pull wrapper
+  ansible.builtin.template:
+    src: foundry-pull.sh.j2
+    dest: "{{ ansible_pull_wrapper_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the ansible-pull service unit
+  ansible.builtin.template:
+    src: ansible-pull.service.j2
+    dest: "/etc/systemd/system/{{ ansible_pull_service_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the ansible-pull timer unit
+  ansible.builtin.template:
+    src: ansible-pull.timer.j2
+    dest: "/etc/systemd/system/{{ ansible_pull_timer_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush systemd reload before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the ansible-pull timer
+  ansible.builtin.systemd:
+    name: "{{ ansible_pull_timer_name }}"
+    enabled: true
+    state: started

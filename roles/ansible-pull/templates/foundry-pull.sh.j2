@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+log_file="{{ ansible_pull_log_file }}"
+
+{
+  printf '\n[%s] Starting foundry ansible-pull\n' "$(date --iso-8601=seconds)"
+  ANSIBLE_CONFIG="{{ ansible_pull_config_file }}" ansible-pull \
+    -U "{{ ansible_pull_repo_url }}" \
+    -d "{{ ansible_pull_checkout_dir }}" \
+    "{{ ansible_pull_playbook }}"
+  status=$?
+  printf '[%s] foundry ansible-pull exited with status %s\n' "$(date --iso-8601=seconds)" "$status"
+  exit "$status"
+} >> "$log_file" 2>&1

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run foundry ansible-pull on boot and every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Persistent=true
+Unit={{ ansible_pull_service_name }}
+
+[Install]
+WantedBy=timers.target
