@@ -8,3 +8,4 @@ ansible_pull_config_file: /etc/ansible/ansible.cfg
 ansible_pull_wrapper_path: /usr/local/bin/foundry-pull
 ansible_pull_service_name: ansible-pull.service
 ansible_pull_timer_name: ansible-pull.timer
+ansible_pull_apt_lock_timeout: 600
