@@ -20,8 +20,7 @@
       - git
       - zsh
     state: present
-    update_cache: true
-    cache_valid_time: 3600
+    lock_timeout: 30
 
 - name: Ensure human user groups exist
   ansible.builtin.group:
@@ -53,6 +52,36 @@
     owner: "{{ item }}"
     group: "{{ item }}"
     mode: "0755"
+  loop: "{{ foundry_users }}"
+
+- name: Ensure per-user config root directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ foundry_users }}"
+
+- name: Ensure per-user CLI config directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item.0 }}/.config/{{ item.1 }}"
+    state: directory
+    owner: "{{ item.0 }}"
+    group: "{{ item.0 }}"
+    mode: "0700"
+  loop: "{{ foundry_users | product(users_cli_config_dirs) | list }}"
+  loop_control:
+    label: "/home/{{ item.0 }}/.config/{{ item.1 }}"
+
+- name: Seed initial GitHub CLI config per user
+  ansible.builtin.copy:
+    dest: "/home/{{ item }}/.config/gh/config.yml"
+    content: "{{ users_gh_initial_config | to_nice_yaml(indent=2, sort_keys=true) }}"
+    force: false
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
   loop: "{{ foundry_users }}"
 
 - name: Ensure user SSH directories exist

@@ -1,0 +1,113 @@
+---
+- name: Require Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+    fail_msg: "The developer_clis role is written for Ubuntu hosts."
+
+- name: Check developer CLI apt prerequisites
+  ansible.builtin.command:
+    cmd: "dpkg-query -W {{ developer_clis_prerequisite_packages | join(' ') }}"
+  register: developer_clis_prerequisite_check
+  changed_when: false
+  failed_when: false
+
+- name: Install missing developer CLI apt prerequisites
+  ansible.builtin.command:
+    cmd: >-
+      apt-get -o DPkg::Lock::Timeout=30 install -y
+      {{ developer_clis_prerequisite_packages | join(' ') }}
+  changed_when: true
+  when: developer_clis_prerequisite_check.rc != 0
+
+- name: Check whether git is installed
+  ansible.builtin.stat:
+    path: /usr/bin/git
+  register: developer_clis_git
+
+- name: Ensure git is installed
+  ansible.builtin.command:
+    cmd: "apt-get -o DPkg::Lock::Timeout=30 install -y {{ developer_clis_git_package }}"
+  changed_when: true
+  when: not developer_clis_git.stat.exists
+
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install GitHub CLI apt keyring
+  ansible.builtin.get_url:
+    url: "{{ developer_clis_github_keyring_url }}"
+    dest: "{{ developer_clis_github_keyring_path }}"
+    checksum: "{{ developer_clis_github_keyring_checksum }}"
+    timeout: 30
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Add GitHub CLI apt repository
+  ansible.builtin.deb822_repository:
+    name: github-cli
+    types:
+      - deb
+    uris:
+      - "{{ developer_clis_github_apt_repo }}"
+    suites:
+      - stable
+    components:
+      - main
+    architectures:
+      - "{{ developer_clis_apt_arch_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+    signed_by: "{{ developer_clis_github_keyring_path }}"
+    state: present
+  register: developer_clis_github_repo
+
+- name: Check whether GitHub CLI is installed
+  ansible.builtin.stat:
+    path: /usr/bin/gh
+  register: developer_clis_gh
+
+- name: Refresh GitHub CLI apt cache when needed
+  ansible.builtin.command:
+    cmd: >-
+      apt-get update
+      -o Acquire::http::Timeout=30
+      -o Acquire::https::Timeout=30
+      -o Dir::Etc::sourcelist=sources.list.d/github-cli.sources
+      -o Dir::Etc::sourceparts=-
+      -o APT::Get::List-Cleanup=0
+  changed_when: true
+  when: not developer_clis_gh.stat.exists
+
+- name: Ensure GitHub CLI is installed
+  ansible.builtin.command:
+    cmd: "apt-get -o DPkg::Lock::Timeout=30 install -y {{ developer_clis_gh_package }}"
+  changed_when: true
+  when: not developer_clis_gh.stat.exists
+
+- name: Resolve tea release architecture
+  ansible.builtin.set_fact:
+    developer_clis_tea_arch: "{{ developer_clis_tea_arch_map.get(ansible_facts['architecture'], '') }}"
+
+- name: Require supported tea architecture
+  ansible.builtin.assert:
+    that:
+      - developer_clis_tea_arch is defined
+      - developer_clis_tea_arch | length > 0
+    fail_msg: >-
+      No tea release architecture is mapped for
+      {{ ansible_facts['architecture'] }}.
+
+- name: Install Gitea tea CLI
+  ansible.builtin.get_url:
+    url: >-
+      {{ developer_clis_tea_release_base_url }}/v{{ developer_clis_tea_version }}/tea-{{ developer_clis_tea_version }}-linux-{{ developer_clis_tea_arch }}
+    dest: "{{ developer_clis_tea_install_path }}"
+    timeout: 30
+    owner: root
+    group: root
+    mode: "0755"
