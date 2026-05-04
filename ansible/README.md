@@ -252,12 +252,28 @@ cd ansible
 ansible-playbook --vault-password-file .vault-password playbooks/tailscale.yml
 ```
 
-To pass extra flags to `tailscale up`, override `foundry_tailscale_args`:
+To advertise the Foundry LAN to Tailscale for Plex and other local services,
+put the subnet route in the ignored private vars file:
+
+```yaml
+# ansible/group_vars/all/99-private.yml
+foundry_tailscale_advertise_routes:
+  - 192.168.1.0/24
+```
+
+Use the real CIDR for the Foundry network. The `tailscale` role enables Linux
+IPv4 and IPv6 forwarding when advertised routes are configured, then passes the
+routes to `tailscale up` as `--advertise-routes=...`.
+
+After the playbook runs, approve the advertised route in the Tailscale admin
+console before Tailnet clients can use it.
+
+To pass extra flags to `tailscale up`, prefer `foundry_tailscale_extra_args`:
 
 ```sh
 cd ansible
 ansible-playbook playbooks/tailscale.yml \
-  -e '{"foundry_tailscale_args":"--hostname=foundry --ssh"}'
+  -e '{"foundry_tailscale_extra_args":["--ssh"]}'
 ```
 
 When `foundry_tailscale_state` is `present`, the local `tailscale` role skips
