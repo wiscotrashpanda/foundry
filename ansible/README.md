@@ -109,7 +109,8 @@ ansible-playbook foundry.yml
 3. `playbooks/tailscale.yml`
 4. `playbooks/users.yml`
 5. `playbooks/storage.yml`
-6. `playbooks/docker.yml`
+6. `playbooks/samba.yml`
+7. `playbooks/docker.yml`
 
 ## Individual Playbooks
 
@@ -119,6 +120,7 @@ ansible-playbook playbooks/terminfo.yml
 ansible-playbook playbooks/tailscale.yml
 ansible-playbook playbooks/users.yml
 ansible-playbook playbooks/storage.yml
+ansible-playbook playbooks/samba.yml
 ansible-playbook playbooks/docker.yml
 ansible-playbook playbooks/system-updates.yml
 ```
@@ -175,6 +177,42 @@ The `storage` role authorizes the G-Technology G-DRIVE Thunderbolt device,
 mounts filesystem UUID `c072b758-e4e4-44ea-8251-ef0891930805` at `/mnt/store`,
 persists the mount in `/etc/fstab`, and prepares the Plex directories used by
 `docker/plex-media-server.yml`.
+
+## SMB
+
+The `samba` role installs Samba, allows only local and Tailnet source addresses,
+disables NetBIOS name service, and serves the `store` share from
+`/mnt/store/share`. Samba still opens TCP port `445` on the host, but
+non-Tailnet clients are rejected by Samba's `hosts allow`/`hosts deny` rules.
+
+No new partition is required for this setup. SMB serves a directory from the
+existing `/mnt/store` filesystem; create a separate partition only if you want
+hard isolation, different mount options, a quota boundary, or a separate backup
+and lifecycle policy.
+
+Access is limited to users in `samba_users`, which defaults to `foundry_users`.
+Those users must also have Samba passwords because Samba does not reuse SSH
+keys.
+
+Set the Samba password once on the server:
+
+```sh
+ssh foundry
+sudo smbpasswd -a josh
+sudo smbpasswd -e josh
+```
+
+Then connect from macOS Finder with `smb://foundry/store`, choose
+`Registered User`, and log in as `josh` with the Samba password from
+`smbpasswd`.
+
+Or store `samba_user_passwords` in the encrypted vault if you want Ansible to
+manage SMB passwords, then run with `-e samba_manage_passwords=true`. From a
+Tailnet client, connect to:
+
+```text
+smb://foundry/store
+```
 
 ## Docker
 

@@ -1,0 +1,46 @@
+# Ansible managed
+
+[global]
+   server role = standalone server
+   workgroup = {{ samba_workgroup }}
+   netbios name = {{ samba_netbios_name }}
+   server string = {{ samba_server_string }}
+
+   security = user
+   map to guest = never
+   obey pam restrictions = yes
+   unix password sync = no
+   pam password change = no
+
+   disable netbios = yes
+   smb ports = 445
+   interfaces = {{ samba_effective_interfaces | default(samba_interfaces) | join(' ') }}
+   bind interfaces only = {{ samba_bind_interfaces_only | ternary('yes', 'no') }}
+   hosts allow = {{ samba_hosts_allow | join(' ') }}
+   hosts deny = {{ samba_hosts_deny | join(' ') }}
+
+   server min protocol = SMB2_10
+   client min protocol = SMB2_10
+
+   load printers = no
+   printing = bsd
+   printcap name = /dev/null
+   disable spoolss = yes
+
+{% for share in samba_shares %}
+[{{ share.name }}]
+   path = {{ share.path }}
+   comment = {{ share.comment | default('') }}
+   browseable = {{ share.browseable | default(true) | ternary('yes', 'no') }}
+   read only = {{ share.read_only | default(false) | ternary('yes', 'no') }}
+   guest ok = {{ share.guest_ok | default(false) | ternary('yes', 'no') }}
+   valid users = {{ share.valid_users | default('@' ~ samba_group) }}
+   force group = {{ share.force_group | default(samba_group) }}
+   create mask = {{ share.create_mask | default('0664') }}
+   directory mask = {{ share.directory_mask | default('2775') }}
+   inherit permissions = yes
+   store dos attributes = yes
+   ea support = yes
+   vfs objects = {{ share.vfs_objects | default(samba_share_vfs_objects) | join(' ') }}
+
+{% endfor %}

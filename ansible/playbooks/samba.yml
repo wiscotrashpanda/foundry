@@ -1,0 +1,8 @@
+---
+- name: Configure foundry Tailnet SMB
+  hosts: foundry
+  gather_facts: false
+  become: true
+
+  roles:
+    - role: samba
