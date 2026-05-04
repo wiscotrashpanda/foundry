@@ -1,0 +1,23 @@
+---
+developer_clis_github_keyring_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+developer_clis_github_keyring_checksum: sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+developer_clis_github_keyring_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+developer_clis_github_apt_repo: https://cli.github.com/packages
+developer_clis_apt_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armhf
+  ppc64le: ppc64el
+
+developer_clis_prerequisite_packages:
+  - ca-certificates
+  - python3-debian
+developer_clis_git_package: git
+developer_clis_gh_package: gh
+
+developer_clis_tea_version: 0.14.0
+developer_clis_tea_release_base_url: https://gitea.com/gitea/tea/releases/download
+developer_clis_tea_install_path: /usr/local/bin/tea
+developer_clis_tea_arch_map:
+  x86_64: amd64
+  aarch64: arm64

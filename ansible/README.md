@@ -27,9 +27,15 @@ vault password.
 
 ## Vault Password Helper
 
-`ansible.cfg` reads the vault password from `.vault-password`. This file is
-gitignored. If it fetches the password from 1Password, it must be executable and
-start with a shebang:
+Ordinary playbooks do not load a vault password by default. When a playbook
+needs encrypted values, pass the helper explicitly:
+
+```sh
+ansible-playbook --vault-password-file .vault-password playbooks/tailscale.yml
+```
+
+`.vault-password` is gitignored. If it fetches the password from 1Password, it
+must be executable and start with a shebang:
 
 ```sh
 #!/bin/sh
@@ -114,16 +120,26 @@ ansible-playbook playbooks/docker.yml
 
 ## User Configuration
 
-The `users` role manages:
+`playbooks/users.yml` runs the `developer_clis` role before the `users` role.
+Together they manage:
 
 - human users from `foundry_users`
+- `git`, GitHub CLI (`gh`), and Gitea CLI (`tea`) for those users
 - membership in the `admin-sudo` passwordless sudo group
 - SSH access from `~/.ssh/foundry.pub`
 - each user's `/home/<user>/code` directory
+- per-user CLI config homes under `/home/<user>/.config/gh` and
+  `/home/<user>/.config/tea`
 - zsh, Oh My Zsh, `.zshrc`, and `.gitconfig`
 - shared `xterm-ghostty` terminfo through the `terminfo` role dependency
 
-User names and email addresses live in `group_vars/all.yml`.
+The `developer_clis` role installs `gh` from GitHub's official apt repository
+and `tea` from the pinned Gitea release binary named by
+`developer_clis_tea_version`.
+
+User names and email addresses live in `group_vars/all.yml`. GitHub and Gitea
+auth tokens are not stored by Ansible; each user can run `gh auth login` and
+`tea login add` from their own account when credentials are available.
 
 ## External Storage
 
@@ -167,7 +183,7 @@ Then run:
 
 ```sh
 cd ansible
-ansible-playbook playbooks/tailscale.yml
+ansible-playbook --vault-password-file .vault-password playbooks/tailscale.yml
 ```
 
 To pass extra flags to `tailscale up`, override `foundry_tailscale_args`:

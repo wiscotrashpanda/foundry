@@ -22,6 +22,16 @@ users_zsh_aliases:
 # hook). Useful for one-off env exports without forking the template.
 users_zsh_extra_lines: []
 
+# CLI configuration homes are created per-user so gh/tea auth state is never
+# shared between managed accounts. Auth tokens are intentionally left for each
+# user to add interactively with the CLI.
+users_cli_config_dirs:
+  - gh
+  - tea
+users_gh_initial_config:
+  git_protocol: ssh
+  prompt: enabled
+
 # Per-user overrides: a map of username -> dict that gets merged on top of the
 # role-level defaults when rendering each user's .zshrc / .gitconfig. Example:
 #   users_overrides:
