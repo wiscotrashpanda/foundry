@@ -1,0 +1,58 @@
+---
+- name: Ensure ansible-pull prerequisites are installed
+  ansible.builtin.apt:
+    name: "{{ self_pull_apt_packages }}"
+    state: present
+    lock_timeout: 30
+
+- name: Ensure foundry state directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ self_pull_etc_dir }}", mode: "0750" }
+    - { path: "{{ self_pull_state_dir }}", mode: "0755" }
+    - { path: "{{ self_pull_log_dir }}", mode: "0755" }
+    - { path: "{{ self_pull_collections_dir }}", mode: "0755" }
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Install foundry-pull wrapper
+  ansible.builtin.template:
+    src: foundry-pull.j2
+    dest: "{{ self_pull_wrapper_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install foundry-pull systemd service
+  ansible.builtin.template:
+    src: foundry-pull.service.j2
+    dest: /etc/systemd/system/foundry-pull.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: self_pull_service_unit
+
+- name: Install foundry-pull systemd timer
+  ansible.builtin.template:
+    src: foundry-pull.timer.j2
+    dest: /etc/systemd/system/foundry-pull.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: self_pull_timer_unit
+
+- name: Reload systemd units when changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: self_pull_service_unit.changed or self_pull_timer_unit.changed
+
+- name: Enable and start foundry-pull timer
+  ansible.builtin.systemd:
+    name: foundry-pull.timer
+    enabled: true
+    state: started

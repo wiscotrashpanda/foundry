@@ -3,9 +3,11 @@
 # prerequisite (see ansible/README.md) - the role only adds members to it.
 users_passwordless_sudo_group: admin-sudo
 
-# Public key file on the Ansible controller that gets installed into each
-# user's authorized_keys.
-users_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
+# Public key installed into each user's authorized_keys. Defaults to the copy
+# bundled with this role so the same value works in both push (controller) and
+# pull (ansible-pull on the target) modes. Override only if you need to swap in
+# a different key without editing the role.
+users_public_key_file: "{{ role_path }}/files/foundry.pub"
 
 # Oh My Zsh source - cloned per-user into ~/.oh-my-zsh.
 users_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
