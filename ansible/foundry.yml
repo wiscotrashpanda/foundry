@@ -1,0 +1,6 @@
+---
+# Baseline provisioning for foundry. Tailscale is intentionally separate
+# because enrollment needs an auth key.
+- import_playbook: playbooks/users.yml
+- import_playbook: playbooks/storage.yml
+- import_playbook: playbooks/docker.yml

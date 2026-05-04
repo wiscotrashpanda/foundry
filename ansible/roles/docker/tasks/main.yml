@@ -1,0 +1,90 @@
+---
+- name: Require Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+    fail_msg: "The docker role is written for Ubuntu hosts."
+
+- name: Remove Docker package conflicts
+  ansible.builtin.apt:
+    name: "{{ docker_conflicting_packages }}"
+    state: absent
+
+- name: Ensure Docker apt prerequisites exist
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - python3-debian
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Add Docker apt repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types:
+      - deb
+    uris:
+      - "{{ docker_apt_repo }}"
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+    components:
+      - stable
+    architectures:
+      - "{{ docker_arch_map.get(ansible_facts['architecture'], ansible_facts['architecture']) }}"
+    signed_by: "{{ docker_apt_repo }}/gpg"
+    state: present
+  register: docker_repo
+
+- name: Refresh apt cache after adding Docker repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: docker_repo.changed
+
+- name: Ensure Docker packages exist
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Check whether Docker users exist
+  ansible.builtin.command:
+    cmd: "id -u {{ item }}"
+  register: docker_user_check
+  changed_when: false
+  failed_when: false
+  loop: "{{ foundry_users }}"
+
+- name: Allow existing human users to manage Docker
+  ansible.builtin.user:
+    name: "{{ item.item }}"
+    groups:
+      - docker
+    append: true
+  when: item.rc == 0
+  loop: "{{ docker_user_check.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Ensure Docker Compose service directory exists
+  ansible.builtin.file:
+    path: "{{ docker_compose_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy Docker Compose files
+  ansible.builtin.copy:
+    src: "{{ docker_repo_root }}/docker/{{ item }}"
+    dest: "{{ docker_compose_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ docker_compose_files }}"

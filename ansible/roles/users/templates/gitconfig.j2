@@ -1,0 +1,11 @@
+{#-
+  gitconfig.j2 - rendered into /home/<user>/.gitconfig by the `users` role.
+
+  Required vars at render time (set per user in tasks/main.yml):
+    users_current_full_name  display name for [user] name
+    users_current_email      email for [user] email
+-#}
+# {{ ansible_managed }}
+[user]
+	name = {{ users_current_full_name }}
+	email = {{ users_current_email }}

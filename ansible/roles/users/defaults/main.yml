@@ -1,0 +1,32 @@
+---
+# Sudo group with passwordless escalation. Created on the host as a manual
+# prerequisite (see ansible/README.md) - the role only adds members to it.
+users_passwordless_sudo_group: admin-sudo
+
+# Public key file on the Ansible controller that gets installed into each
+# user's authorized_keys.
+users_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/foundry.pub"
+
+# Oh My Zsh source - cloned per-user into ~/.oh-my-zsh.
+users_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
+users_oh_my_zsh_version: master
+
+# .zshrc template variables (consumed by templates/zshrc.j2). Override these
+# in group_vars or host_vars to customize the rendered file.
+users_zsh_theme: robbyrussell
+users_zsh_plugins:
+  - git
+users_zsh_aliases:
+  ls: eza
+# Extra raw lines appended to .zshrc (after aliases, before the local sourcing
+# hook). Useful for one-off env exports without forking the template.
+users_zsh_extra_lines: []
+
+# Per-user overrides: a map of username -> dict that gets merged on top of the
+# role-level defaults when rendering each user's .zshrc / .gitconfig. Example:
+#   users_overrides:
+#     josh:
+#       zsh_plugins: [git, docker, kubectl]
+#       zsh_aliases:
+#         k: kubectl
+users_overrides: {}

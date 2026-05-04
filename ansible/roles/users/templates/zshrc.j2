@@ -1,0 +1,45 @@
+{#-
+  zshrc.j2 - rendered into /home/<user>/.zshrc by the `users` role.
+
+  Inputs:
+    users_current_user     username this file is being rendered for
+    users_zsh_theme        Oh My Zsh theme name (role default)
+    users_zsh_plugins      list of Oh My Zsh plugin names (role default)
+    users_zsh_aliases      dict of alias name -> command (role default)
+    users_zsh_extra_lines  list of additional raw zsh lines (role default)
+    users_overrides        dict of <username> -> per-user override dict; keys
+                           on each entry: zsh_theme, zsh_plugins, zsh_aliases,
+                           zsh_extra_lines
+
+  Per-user overrides are merged on top of the role defaults below. Manual
+  edits belong in ~/.zshrc.local - this file is overwritten on every run.
+-#}
+{%- set _override = users_overrides[users_current_user] | default({}) -%}
+{%- set _theme = _override.zsh_theme | default(users_zsh_theme) -%}
+{%- set _plugins = _override.zsh_plugins | default(users_zsh_plugins) -%}
+{%- set _aliases = users_zsh_aliases | combine(_override.zsh_aliases | default({})) -%}
+{%- set _extra = _override.zsh_extra_lines | default(users_zsh_extra_lines) -%}
+# {{ ansible_managed }}
+# Foundry-managed zsh config. Local edits go in ~/.zshrc.local.
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="{{ _theme }}"
+plugins=({{ _plugins | join(' ') }})
+
+source "$ZSH/oh-my-zsh.sh"
+
+{% if _aliases %}
+# Aliases
+{% for name, command in _aliases | dictsort %}
+alias {{ name }}={{ command | quote }}
+{% endfor %}
+
+{% endif %}
+{% if _extra %}
+{% for line in _extra %}
+{{ line }}
+{% endfor %}
+
+{% endif %}
+# Per-user overrides
+[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
