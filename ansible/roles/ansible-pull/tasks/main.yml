@@ -12,12 +12,20 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+    lock_timeout: "{{ ansible_pull_apt_lock_timeout }}"
 
 - name: Enable the official Ansible PPA
   ansible.builtin.apt_repository:
     repo: ppa:ansible/ansible
     state: present
+    update_cache: false
+  register: ansible_pull_ppa
+
+- name: Refresh apt cache after enabling the Ansible PPA
+  ansible.builtin.apt:
     update_cache: true
+    lock_timeout: "{{ ansible_pull_apt_lock_timeout }}"
+  when: ansible_pull_ppa.changed
 
 - name: Install Ansible and ansible-pull dependencies
   ansible.builtin.apt:
@@ -27,6 +35,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
+    lock_timeout: "{{ ansible_pull_apt_lock_timeout }}"
 
 - name: Ensure Ansible configuration directory exists
   ansible.builtin.file:
