@@ -2,3 +2,4 @@
 collections/
 *.passwd
 .vault-password
+group_vars/all/99-private.yml

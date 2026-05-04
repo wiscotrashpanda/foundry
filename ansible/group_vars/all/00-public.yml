@@ -1,0 +1,6 @@
+---
+# Public-safe defaults. Put host-specific human account details in
+# ansible/group_vars/all/99-private.yml, which is ignored by git.
+foundry_users: []
+foundry_user_full_name: Foundry User
+foundry_user_emails: {}

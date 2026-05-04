@@ -13,7 +13,7 @@ alias `foundry-admin`, which should log in as the provisioning `ansible` user.
 ansible/
   ansible.cfg
   inventory.yml
-  group_vars/all.yml
+  group_vars/all/
   foundry.yml
   playbooks/
   roles/
@@ -24,6 +24,10 @@ ansible/
 implementation. `vault/` contains encrypted secret files that are loaded only by
 the playbook that needs them, so ordinary inventory operations do not require a
 vault password.
+
+`group_vars/all/00-public.yml` contains public-safe defaults that are safe to
+commit. Put local human-user details in `group_vars/all/99-private.yml`; that
+file is ignored by git and overrides the public defaults when present.
 
 ## Vault Password Helper
 
@@ -137,9 +141,10 @@ The `developer_clis` role installs `gh` from GitHub's official apt repository
 and `tea` from the pinned Gitea release binary named by
 `developer_clis_tea_version`.
 
-User names and email addresses live in `group_vars/all.yml`. GitHub and Gitea
-auth tokens are not stored by Ansible; each user can run `gh auth login` and
-`tea login add` from their own account when credentials are available.
+User names and email addresses live in the ignored
+`group_vars/all/99-private.yml` file. GitHub and Gitea auth tokens are not
+stored by Ansible; each user can run `gh auth login` and `tea login add` from
+their own account when credentials are available.
 
 ## External Storage
 
