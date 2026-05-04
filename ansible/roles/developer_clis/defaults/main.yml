@@ -63,10 +63,10 @@ developer_clis_gcloud_packages:
   - google-cloud-cli
   - google-cloud-cli-gke-gcloud-auth-plugin
 
-# Node.js (NodeSource). Bump the major to move the system Node.
-# Note: on recent Ubuntu releases (24.04+) the distro repo also ships current
-# Node 22 LTS. apt may pick Ubuntu's nodejs over NodeSource's, in which case
-# `npm` must be installed as a separate package - hence the package list.
+# Node.js (NodeSource). Bump the major to move the system Node. NodeSource's
+# nodejs bundles its own npm and Conflicts with Ubuntu's `npm` package, so
+# the role pins nodejs to NodeSource via /etc/apt/preferences.d and installs
+# nodejs only - npm comes along for the ride.
 developer_clis_nodejs_major: 22
 developer_clis_nodejs_keyring_url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
 developer_clis_nodejs_keyring_path: /etc/apt/keyrings/nodesource.asc
@@ -74,7 +74,6 @@ developer_clis_nodejs_keyring_checksum: ""
 developer_clis_nodejs_apt_repo: "https://deb.nodesource.com/node_{{ developer_clis_nodejs_major }}.x"
 developer_clis_nodejs_packages:
   - nodejs
-  - npm
 
 # Globally-installed npm CLIs (Claude Code, OpenAI Codex). Tracked at @latest;
 # add or remove packages by editing this list.
