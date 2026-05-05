@@ -84,7 +84,8 @@ sudo visudo -cf /etc/sudoers.d/admin-sudo
 
 ## Install Collections
 
-Install required collections once:
+`requirements.yml` is currently empty — Foundry no longer depends on any
+external Galaxy collections. Re-run this if collections are added back:
 
 ```sh
 cd ansible
@@ -328,11 +329,16 @@ ansible-playbook playbooks/tailscale.yml \
   -e '{"foundry_tailscale_extra_args":["--ssh"]}'
 ```
 
-When `foundry_tailscale_state` is `present`, the local `tailscale` role skips
-package-manager work if `/usr/bin/tailscale` already exists. This avoids
-recurring apt cache refreshes on an already-enrolled host. Set
-`foundry_tailscale_state: latest` if you want a run to check for package
-updates.
+The `tailscale` role manages Tailscale natively: it installs the apt keyring
+and `pkgs.tailscale.com` repo, installs the `tailscale` package, ensures
+`tailscaled` is enabled and started, then runs `tailscale up` with the
+assembled args. apt operations are idempotent on a converged host.
+`pkgs.tailscale.com` lags brand-new Ubuntu releases; if the host's codename
+isn't yet served, override `foundry_tailscale_apt_suite` to the most recent
+published codename in group_vars/host_vars (mirrors the
+`developer_clis_hashicorp_suite` pattern).
+
+Set `foundry_tailscale_state: absent` to stop and remove the package.
 
 ## Self-Managed (ansible-pull)
 
