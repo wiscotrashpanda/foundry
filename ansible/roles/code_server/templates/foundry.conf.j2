@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+[Service]
+WorkingDirectory=/home/{{ code_server_current_user }}/code
+ExecStart=
+ExecStart=/usr/bin/code-server /home/{{ code_server_current_user }}/code

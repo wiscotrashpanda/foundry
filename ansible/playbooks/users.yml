@@ -8,3 +8,4 @@
     - role: apt_mirror
     - role: developer_clis
     - role: users
+    - role: code_server

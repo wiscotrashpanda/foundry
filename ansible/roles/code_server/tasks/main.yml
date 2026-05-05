@@ -1,0 +1,280 @@
+---
+- name: Require Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+    fail_msg: "The code_server role is written for Ubuntu hosts."
+
+- name: Resolve code-server architecture
+  ansible.builtin.set_fact:
+    code_server_arch: "{{ code_server_arch_map.get(ansible_facts['architecture'], '') }}"
+
+- name: Require supported code-server architecture
+  ansible.builtin.assert:
+    that:
+      - code_server_arch | length > 0
+    fail_msg: "No code-server .deb architecture mapped for {{ ansible_facts['architecture'] }}."
+
+- name: Require supported code-server bind mode
+  ansible.builtin.assert:
+    that:
+      - code_server_bind_mode in ["tailscale", "localhost"]
+    fail_msg: "code_server_bind_mode must be tailscale or localhost."
+
+- name: Ensure code-server prerequisites exist
+  ansible.builtin.apt:
+    name: "{{ code_server_prerequisite_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    lock_timeout: 30
+
+- name: Get latest code-server release
+  ansible.builtin.uri:
+    url: "{{ code_server_releases_url }}"
+    return_content: true
+  register: code_server_release
+  changed_when: false
+
+- name: Resolve latest code-server version
+  ansible.builtin.set_fact:
+    code_server_latest_version: "{{ code_server_release.json.tag_name | regex_replace('^v', '') }}"
+
+- name: Resolve code-server Debian asset pattern
+  ansible.builtin.set_fact:
+    code_server_deb_asset_pattern: "^code-server_{{ code_server_latest_version }}_{{ code_server_arch }}\\.deb$"
+
+- name: Resolve code-server release asset URL
+  ansible.builtin.set_fact:
+    code_server_asset_url: >-
+      {{ (code_server_release.json.assets
+          | selectattr('name', 'match', code_server_deb_asset_pattern)
+          | list
+          | first).browser_download_url }}
+
+- name: Check installed code-server version
+  ansible.builtin.command: code-server --version
+  register: code_server_installed
+  changed_when: false
+  failed_when: false
+
+- name: Resolve installed code-server version
+  ansible.builtin.set_fact:
+    code_server_installed_version: >-
+      {{ code_server_installed.stdout
+         | regex_search('[0-9]+\.[0-9]+\.[0-9]+')
+         | default('', true) }}
+
+- name: Install or update code-server
+  when: code_server_installed_version != code_server_latest_version
+  block:
+    - name: Create code-server staging directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: code-server
+      register: code_server_tmp
+
+    - name: Download code-server Debian package
+      ansible.builtin.get_url:
+        url: "{{ code_server_asset_url }}"
+        dest: "{{ code_server_tmp.path }}/code-server.deb"
+        timeout: "{{ code_server_download_timeout }}"
+        mode: "0644"
+
+    - name: Install code-server Debian package
+      ansible.builtin.apt:
+        deb: "{{ code_server_tmp.path }}/code-server.deb"
+        lock_timeout: 30
+      register: code_server_package_install
+
+  always:
+    - name: Clean up code-server staging directory
+      ansible.builtin.file:
+        path: "{{ code_server_tmp.path }}"
+        state: absent
+      when:
+        - code_server_tmp is defined
+        - code_server_tmp.path is defined
+
+- name: Check configured code-server users exist
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ item }}"
+  register: code_server_user_checks
+  changed_when: false
+  failed_when: false
+  loop: "{{ code_server_users }}"
+
+- name: Require configured code-server users to exist
+  ansible.builtin.fail:
+    msg: >-
+      code-server user {{ item.item }} does not exist. Run the users role first,
+      add the user before enabling code-server, or remove it from code_server_users.
+  when: item.rc != 0
+  loop: "{{ code_server_user_checks.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Read Tailnet IPv4 address for code-server binding
+  ansible.builtin.command:
+    argv:
+      - "{{ code_server_tailscale_binary_path }}"
+      - ip
+      - -4
+  register: code_server_tailnet_ipv4
+  changed_when: false
+  when: code_server_bind_mode == "tailscale"
+
+- name: Require Tailnet IPv4 address for code-server binding
+  ansible.builtin.assert:
+    that:
+      - code_server_tailnet_ipv4.stdout | trim | length > 0
+    fail_msg: "Tailscale did not return an IPv4 address for code-server binding."
+  when: code_server_bind_mode == "tailscale"
+
+- name: Resolve code-server bind host
+  ansible.builtin.set_fact:
+    code_server_bind_host: >-
+      {{ (code_server_tailnet_ipv4.stdout | trim)
+         if code_server_bind_mode == "tailscale"
+         else "127.0.0.1" }}
+
+- name: Initialize code-server port map
+  ansible.builtin.set_fact:
+    code_server_effective_user_ports: {}
+
+- name: Resolve code-server ports
+  ansible.builtin.set_fact:
+    code_server_effective_user_ports: >-
+      {{
+        code_server_effective_user_ports
+        | combine({
+            item: (
+              code_server_user_ports[item]
+              | default((code_server_port_base | int) + ansible_loop.index0)
+              | int
+            )
+          })
+      }}
+  loop: "{{ code_server_users }}"
+  loop_control:
+    extended: true
+
+- name: Require code-server ports to be valid
+  ansible.builtin.assert:
+    that:
+      - item.value | int >= 1
+      - item.value | int <= 65535
+    fail_msg: "code-server port for {{ item.key }} must be between 1 and 65535."
+  loop: "{{ code_server_effective_user_ports | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}:{{ item.value }}"
+
+- name: Require code-server ports to be unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        (code_server_effective_user_ports | dict2items
+        | map(attribute='value') | list | unique | length)
+        == (code_server_effective_user_ports | length)
+    fail_msg: "Each code-server user must have a unique port."
+
+- name: Ensure per-user code-server config directories exist
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config/code-server"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ code_server_users }}"
+
+- name: Generate per-user code-server passwords
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - >-
+        umask 077 && openssl rand -base64 {{ code_server_password_bytes }}
+        > /home/{{ item }}/.config/code-server/password
+    creates: "/home/{{ item }}/.config/code-server/password"
+  become_user: "{{ item }}"
+  loop: "{{ code_server_users }}"
+  no_log: true
+
+- name: Ensure per-user code-server password files are private
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config/code-server/password"
+    state: file
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ code_server_users }}"
+  no_log: true
+
+- name: Read per-user code-server passwords
+  ansible.builtin.slurp:
+    path: "/home/{{ item }}/.config/code-server/password"
+  register: code_server_password_files
+  loop: "{{ code_server_users }}"
+  no_log: true
+
+- name: Render per-user code-server config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "/home/{{ item.item }}/.config/code-server/config.yaml"
+    owner: "{{ item.item }}"
+    group: "{{ item.item }}"
+    mode: "0600"
+  vars:
+    code_server_current_user: "{{ item.item }}"
+    code_server_current_password: "{{ item.content | b64decode | trim }}"
+  loop: "{{ code_server_password_files.results }}"
+  register: code_server_configs
+  no_log: true
+
+- name: Ensure per-user code-server systemd override directories exist
+  ansible.builtin.file:
+    path: "/etc/systemd/system/code-server@{{ item }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ code_server_users }}"
+
+- name: Install per-user code-server systemd overrides
+  ansible.builtin.template:
+    src: foundry.conf.j2
+    dest: "/etc/systemd/system/code-server@{{ item }}.service.d/foundry.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    code_server_current_user: "{{ item }}"
+  loop: "{{ code_server_users }}"
+  register: code_server_systemd_overrides
+
+- name: Reload systemd units for code-server
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: >-
+    code_server_systemd_overrides.changed
+    or (code_server_package_install.changed | default(false))
+
+- name: Enable and start per-user code-server services
+  ansible.builtin.systemd_service:
+    name: "code-server@{{ item }}.service"
+    enabled: true
+    state: started
+  loop: "{{ code_server_users }}"
+
+- name: Restart code-server services after managed changes
+  ansible.builtin.systemd_service:
+    name: "code-server@{{ item }}.service"
+    state: restarted
+  loop: "{{ code_server_users }}"
+  when: >-
+    code_server_configs.changed
+    or code_server_systemd_overrides.changed
+    or (code_server_package_install.changed | default(false))

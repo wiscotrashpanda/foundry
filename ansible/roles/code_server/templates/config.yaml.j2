@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+bind-addr: "{{ code_server_bind_host }}:{{ code_server_effective_user_ports[code_server_current_user] }}"
+auth: password
+password: "{{ code_server_current_password }}"
+cert: false

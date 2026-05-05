@@ -1,0 +1,26 @@
+---
+# code-server is installed once per host, then run as one systemd template
+# instance per managed human user.
+code_server_users: "{{ foundry_users }}"
+
+# code-server publishes .deb assets for amd64 and arm64.
+code_server_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+
+code_server_releases_url: https://api.github.com/repos/coder/code-server/releases/latest
+code_server_download_timeout: 120
+code_server_prerequisite_packages:
+  - ca-certificates
+  - openssl
+
+# Each user gets code_server_port_base + index unless explicitly overridden.
+code_server_port_base: 9000
+code_server_user_ports: {}
+
+# Bind directly to the foundry host's Tailnet IPv4 address by default.
+code_server_bind_mode: tailscale
+code_server_tailscale_binary_path: /usr/bin/tailscale
+
+# Generated once per user when missing.
+code_server_password_bytes: 32

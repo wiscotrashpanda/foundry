@@ -180,6 +180,7 @@ Together they manage:
 - each user's `/home/<user>/code` directory
 - per-user CLI config homes under `~/.config/{gh,tea,gcloud,opencode}` and
   `~/{.aws,.claude,.codex,.terraform.d}`
+- per-user code-server instances serving each user's `/home/<user>/code`
 - zsh, Oh My Zsh, `.zshrc`, and `.gitconfig`
 - shared `xterm-ghostty` terminfo through the `terminfo` role dependency
 
@@ -218,6 +219,39 @@ User names and email addresses live in the ignored
 each user runs `gh auth login`, `tea login add`, `aws configure`,
 `gcloud auth login`, `claude`, `codex`, `opencode auth`, etc. from their own
 account when credentials are available.
+
+### code-server
+
+The `code_server` role installs code-server once from Coder's official GitHub
+release `.deb`, then enables one systemd template instance per user in
+`code_server_users` (default `foundry_users`):
+
+```sh
+sudo systemctl status code-server@josh
+sudo systemctl restart code-server@josh
+```
+
+Each instance starts as that Unix user and opens `/home/<user>/code`. The role
+binds to the foundry host's Tailscale IPv4 address by default, with ports
+assigned from `code_server_port_base` (default `9000`) in `foundry_users` order.
+Override individual ports when you need stable assignments independent of list
+order:
+
+```yaml
+code_server_user_ports:
+  josh: 9000
+```
+
+The role generates a persistent password for each user when missing and writes
+the active code-server config to:
+
+```text
+/home/<user>/.config/code-server/config.yaml
+```
+
+The password is also kept in `/home/<user>/.config/code-server/password` for
+operator lookup. Both files are mode `0600`, owned by the target user, and are
+not stored in this repo or the Ansible vault.
 
 ## External Storage
 
