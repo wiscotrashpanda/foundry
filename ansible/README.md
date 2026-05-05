@@ -178,6 +178,9 @@ directory and is created by the `users` role. The role installs:
 - Claude Code (`@anthropic-ai/claude-code`) and OpenAI Codex (`@openai/codex`)
   — npm globals tracked at `@latest`
 - opencode (`sst/opencode`) — installed from the latest GitHub release tarball
+- Go — installed from the upstream `go.dev/dl` tarball into `/usr/local/go`,
+  re-installed only when the latest stable release is newer than the local copy
+- `python-is-python3` — apt-managed alias so `python` resolves to `python3`
 
 Apt-managed tools follow `developer_clis_apt_package_state` (default
 `latest`). Set it to `present` to install missing packages without upgrading

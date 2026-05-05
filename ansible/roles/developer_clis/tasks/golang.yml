@@ -1,0 +1,91 @@
+---
+- name: Resolve Go architecture
+  ansible.builtin.set_fact:
+    developer_clis_golang_arch: "{{ developer_clis_golang_arch_map.get(ansible_facts['architecture'], '') }}"
+
+- name: Require supported Go architecture
+  ansible.builtin.assert:
+    that:
+      - developer_clis_golang_arch | length > 0
+    fail_msg: "No Go architecture mapped for {{ ansible_facts['architecture'] }}."
+
+- name: Get latest Go release metadata
+  ansible.builtin.uri:
+    url: "{{ developer_clis_golang_releases_url }}"
+    return_content: true
+  register: developer_clis_golang_release
+  changed_when: false
+
+- name: Resolve latest Go version
+  ansible.builtin.set_fact:
+    developer_clis_golang_latest_version: >-
+      {{ (developer_clis_golang_release.json
+          | selectattr('stable', 'equalto', true)
+          | list
+          | first).version | regex_replace('^go', '') }}
+
+- name: Resolve Go release archive filename
+  ansible.builtin.set_fact:
+    developer_clis_golang_archive_name: "go{{ developer_clis_golang_latest_version }}.linux-{{ developer_clis_golang_arch }}.tar.gz"
+
+- name: Check installed Go version
+  ansible.builtin.command: "{{ developer_clis_golang_bin_dir }}/go version"
+  register: developer_clis_golang_installed
+  changed_when: false
+  failed_when: false
+
+- name: Resolve installed Go version
+  ansible.builtin.set_fact:
+    developer_clis_golang_installed_version: >-
+      {{ developer_clis_golang_installed.stdout
+         | regex_search('go([0-9]+\.[0-9]+(\.[0-9]+)?)', '\1')
+         | default([''], true)
+         | first }}
+
+- name: Install or update Go
+  when: developer_clis_golang_installed_version != developer_clis_golang_latest_version
+  block:
+    - name: Create Go staging directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: golang
+      register: developer_clis_golang_tmp
+
+    - name: Download Go release archive
+      ansible.builtin.get_url:
+        url: "{{ developer_clis_golang_download_base_url }}/{{ developer_clis_golang_archive_name }}"
+        dest: "{{ developer_clis_golang_tmp.path }}/{{ developer_clis_golang_archive_name }}"
+        timeout: 300
+        mode: "0644"
+
+    - name: Remove previous Go installation
+      ansible.builtin.file:
+        path: "{{ developer_clis_golang_install_dir }}"
+        state: absent
+
+    - name: Extract Go release archive to /usr/local
+      ansible.builtin.unarchive:
+        src: "{{ developer_clis_golang_tmp.path }}/{{ developer_clis_golang_archive_name }}"
+        dest: "{{ developer_clis_golang_install_dir | dirname }}"
+        remote_src: true
+        owner: root
+        group: root
+
+  always:
+    - name: Clean up Go staging directory
+      ansible.builtin.file:
+        path: "{{ developer_clis_golang_tmp.path }}"
+        state: absent
+      when:
+        - developer_clis_golang_tmp is defined
+        - developer_clis_golang_tmp.path is defined
+
+- name: Expose Go binaries on PATH
+  ansible.builtin.file:
+    src: "{{ developer_clis_golang_install_dir }}/bin/{{ item }}"
+    dest: "{{ developer_clis_golang_bin_dir }}/{{ item }}"
+    state: link
+    force: true
+  loop:
+    - go
+    - gofmt

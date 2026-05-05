@@ -1,0 +1,8 @@
+---
+- name: Alias python to python3
+  ansible.builtin.apt:
+    name: "{{ developer_clis_python_is_python3_package }}"
+    state: "{{ developer_clis_apt_package_state }}"
+    update_cache: true
+    cache_valid_time: "{{ developer_clis_apt_cache_valid_time }}"
+    lock_timeout: 30

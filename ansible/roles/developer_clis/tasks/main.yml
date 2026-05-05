@@ -31,3 +31,9 @@
 
 - name: Install opencode
   ansible.builtin.import_tasks: opencode.yml
+
+- name: Install Go
+  ansible.builtin.import_tasks: golang.yml
+
+- name: Alias python to python3
+  ansible.builtin.import_tasks: python.yml
