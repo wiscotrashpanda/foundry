@@ -256,6 +256,11 @@ cd ansible
 TAILSCALE_AUTHKEY=tskey-auth-... ansible-playbook playbooks/tailscale.yml
 ```
 
+After the host is already enrolled, the role detects the existing Tailscale
+state with `tailscale status --json` before it requires an auth key. Steady-state
+runs therefore do not need `TAILSCALE_AUTHKEY` or the encrypted
+`vault_tailscale_authkey` just to keep the rest of the baseline converging.
+
 Persistent encrypted secret:
 
 ```sh

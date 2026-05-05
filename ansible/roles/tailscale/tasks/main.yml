@@ -1,4 +1,39 @@
 ---
+- name: Check whether Tailscale is already installed
+  ansible.builtin.stat:
+    path: "{{ foundry_tailscale_binary_path }}"
+  register: foundry_tailscale_binary
+
+- name: Read existing Tailscale status
+  ansible.builtin.command:
+    argv:
+      - "{{ foundry_tailscale_binary_path }}"
+      - status
+      - --json
+  register: foundry_tailscale_status
+  changed_when: false
+  failed_when: false
+  when:
+    - foundry_tailscale_binary.stat.exists
+    - foundry_tailscale_state != 'absent'
+
+- name: Parse existing Tailscale status
+  ansible.builtin.set_fact:
+    foundry_tailscale_status_json: "{{ foundry_tailscale_status.stdout | from_json }}"
+  when:
+    - foundry_tailscale_status is not skipped
+    - foundry_tailscale_status.rc == 0
+    - foundry_tailscale_status.stdout | trim | length > 0
+
+- name: Determine whether Tailscale is already enrolled
+  ansible.builtin.set_fact:
+    foundry_tailscale_already_enrolled: >-
+      {{
+        foundry_tailscale_status_json is defined
+        and ((foundry_tailscale_status_json.get('Self') or {}).get('ID', '') | length > 0)
+        and foundry_tailscale_status_json.get('BackendState', '') not in ['NeedsLogin', 'NoState']
+      }}
+
 - name: Check for the optional Tailscale vault file
   ansible.builtin.stat:
     path: "{{ foundry_tailscale_vault_file }}"
@@ -14,6 +49,7 @@
   no_log: true
   when:
     - foundry_tailscale_vault.stat.exists
+    - not (foundry_tailscale_already_enrolled | bool)
     - lookup('env', 'TAILSCALE_AUTHKEY') | trim | length == 0
 
 - name: Require an auth key
@@ -23,6 +59,9 @@
     fail_msg: >-
       Set TAILSCALE_AUTHKEY or provide vault_tailscale_authkey in
       {{ foundry_tailscale_vault_file }}.
+  when:
+    - foundry_tailscale_state != 'absent'
+    - not (foundry_tailscale_already_enrolled | bool)
 
 - name: Normalize Tailscale route and argument inputs
   ansible.builtin.set_fact:
@@ -103,11 +142,6 @@
     - foundry_tailscale_subnet_routing_sysctl.changed
     - not ansible_check_mode
 
-- name: Check whether Tailscale is already installed
-  ansible.builtin.stat:
-    path: "{{ foundry_tailscale_binary_path }}"
-  register: foundry_tailscale_binary
-
 - name: Apply the artis3n.tailscale.machine role
   ansible.builtin.include_role:
     name: artis3n.tailscale.machine
@@ -115,5 +149,20 @@
     state: "{{ foundry_tailscale_state }}"
     tailscale_authkey: "{{ foundry_tailscale_authkey }}"
     tailscale_args: "{{ foundry_tailscale_effective_args }}"
+    tailscale_up_skip: >-
+      {{
+        foundry_tailscale_state != 'absent'
+        and foundry_tailscale_already_enrolled | bool
+        and foundry_tailscale_authkey | trim | length == 0
+      }}
     tailscale_manage_binaries_skip: >-
       {{ foundry_tailscale_state == 'present' and foundry_tailscale_binary.stat.exists }}
+
+- name: Apply Tailscale arguments on already-enrolled node without auth key
+  ansible.builtin.command:
+    cmd: "{{ foundry_tailscale_binary_path }} up {{ foundry_tailscale_effective_args }}"
+  changed_when: false
+  when:
+    - foundry_tailscale_state != 'absent'
+    - foundry_tailscale_already_enrolled | bool
+    - foundry_tailscale_authkey | trim | length == 0
