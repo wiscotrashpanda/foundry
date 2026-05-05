@@ -50,6 +50,11 @@ ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR" \
 # like apt_mirror are reported as missing.
 export ANSIBLE_CONFIG="$REPO_DIR/ansible/ansible.cfg"
 export ANSIBLE_COLLECTIONS_PATH="$COLLECTIONS_DIR"
+# The cfg sets vault_password_file = .vault-password (relative to the cfg file)
+# for push mode. That path does not exist in the pull-mode checkout; ansible
+# eagerly validates the cfg setting and aborts before honoring the CLI
+# --vault-password-file. Set the env var, which beats the cfg cleanly.
+export ANSIBLE_VAULT_PASSWORD_FILE="$VAULT_PASSWORD_FILE"
 
 # --limit foundry overrides ansible-pull's default localhost limit so plays
 # targeting `hosts: foundry` actually run against the inventory host.
