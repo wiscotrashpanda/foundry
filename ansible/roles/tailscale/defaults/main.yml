@@ -10,3 +10,21 @@ foundry_tailscale_vault_file: "{{ inventory_dir }}/vault/foundry.yml"
 foundry_tailscale_binary_path: /usr/bin/tailscale
 foundry_tailscale_authkey: >-
   {{ vault_tailscale_authkey | default(lookup('env', 'TAILSCALE_AUTHKEY'), true) }}
+
+# Apt provisioning for Tailscale's official package repo. pkgs.tailscale.com
+# publishes per-codename suites and lags behind brand-new Ubuntu releases, so
+# override `foundry_tailscale_apt_suite` in group_vars/host_vars to the most
+# recent published codename if the host's release is not yet served (mirrors
+# the developer_clis_hashicorp_suite pattern).
+foundry_tailscale_apt_keyring_path: /etc/apt/keyrings/tailscale-archive-keyring.gpg
+foundry_tailscale_apt_keyring_url: >-
+  https://pkgs.tailscale.com/stable/ubuntu/{{ foundry_tailscale_apt_suite }}.noarmor.gpg
+foundry_tailscale_apt_repo: https://pkgs.tailscale.com/stable/ubuntu
+foundry_tailscale_apt_suite: "{{ ansible_facts['distribution_release'] }}"
+foundry_tailscale_apt_package: tailscale
+foundry_tailscale_apt_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armhf
+  ppc64le: ppc64el
+foundry_tailscale_service_name: tailscaled
