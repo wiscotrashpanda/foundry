@@ -21,9 +21,8 @@ ansible/
 ```
 
 `playbooks/` contains the command entrypoints. `roles/` contains the reusable
-implementation. `vault/` contains encrypted secret files that are loaded only by
-the playbook that needs them, so ordinary inventory operations do not require a
-vault password.
+implementation. `vault/` contains encrypted secret files for roles that need
+secrets, such as Tailscale and optional Samba password management.
 
 `group_vars/all/00-public.yml` contains public-safe defaults that are safe to
 commit. Put local human-user details in `group_vars/all/99-private.yml`; that
@@ -31,15 +30,19 @@ file is ignored by git and overrides the public defaults when present.
 
 ## Vault Password Helper
 
-Ordinary playbooks do not load a vault password by default. When a playbook
-needs encrypted values, pass the helper explicitly:
+`ansible.cfg` sets `vault_password_file = .vault-password`, so local Ansible
+commands run from this directory expect `ansible/.vault-password` to exist even
+when a specific playbook does not decrypt vault content. Create it once before
+using the repo-local config.
+
+With the repo-local config, normal runs can use the shorter command form:
 
 ```sh
-ansible-playbook --vault-password-file .vault-password playbooks/tailscale.yml
+ansible-playbook playbooks/tailscale.yml
 ```
 
-`.vault-password` is gitignored. If it fetches the password from 1Password, it
-must be executable and start with a shebang:
+`.vault-password` is gitignored. If it fetches the password from 1Password, make
+it executable and start it with a shebang:
 
 ```sh
 #!/bin/sh
@@ -48,6 +51,9 @@ op read "op://<vault>/<item>/<field>"
 
 If `.vault-password` contains the raw password instead, remove the executable
 bit so Ansible reads it as a plain password file.
+
+To override the helper for a one-off run, pass `--vault-password-file <path>` or
+set `ANSIBLE_VAULT_PASSWORD_FILE=<path>`.
 
 ## Manual Server Prerequisites
 
@@ -102,26 +108,31 @@ cd ansible
 ansible-playbook foundry.yml
 ```
 
-`foundry.yml` imports the ordinary playbooks in order:
+`foundry.yml` imports the baseline playbooks in order:
 
 1. `playbooks/connectivity.yml`
-2. `playbooks/terminfo.yml`
-3. `playbooks/tailscale.yml`
-4. `playbooks/users.yml`
-5. `playbooks/storage.yml`
-6. `playbooks/samba.yml`
-7. `playbooks/docker.yml`
+2. `playbooks/apt-mirror.yml`
+3. `playbooks/terminfo.yml`
+4. `playbooks/tailscale.yml`
+5. `playbooks/users.yml`
+6. `playbooks/storage.yml`
+7. `playbooks/samba.yml`
+8. `playbooks/docker.yml`
+9. `playbooks/self-pull.yml`
 
 ## Individual Playbooks
 
 ```sh
 cd ansible
+ansible-playbook playbooks/connectivity.yml
+ansible-playbook playbooks/apt-mirror.yml
 ansible-playbook playbooks/terminfo.yml
 ansible-playbook playbooks/tailscale.yml
 ansible-playbook playbooks/users.yml
 ansible-playbook playbooks/storage.yml
 ansible-playbook playbooks/samba.yml
 ansible-playbook playbooks/docker.yml
+ansible-playbook playbooks/self-pull.yml
 ansible-playbook playbooks/system-updates.yml
 ```
 
@@ -144,6 +155,18 @@ cd ansible
 ansible-playbook playbooks/system-updates.yml -e system_updates_reboot=true
 ```
 
+## Apt Mirror
+
+The `apt_mirror` role rewrites Ubuntu's deb822 sources file at
+`/etc/apt/sources.list.d/ubuntu.sources` so package installs use the configured
+regional mirror. It is imported early by `foundry.yml` and also runs at the
+start of `playbooks/users.yml` before developer CLI apt repositories and
+packages are managed.
+
+The default archive mirror is `us.archive.ubuntu.com`; override
+`apt_mirror_archive_host` or `apt_mirror_security_host` in private vars when a
+specific mirror is faster from the Foundry network.
+
 ## User Configuration
 
 `playbooks/users.yml` runs the `developer_clis` role before the `users` role.
@@ -152,7 +175,7 @@ Together they manage:
 - human users from `foundry_users`
 - system-wide developer CLIs installed once per host (see below)
 - membership in the `admin-sudo` passwordless sudo group
-- SSH access from `~/.ssh/foundry.pub`
+- SSH access from the public key bundled at `roles/users/files/foundry.pub`
 - each user's `/home/<user>/code` directory
 - per-user CLI config homes under `~/.config/{gh,tea,gcloud,opencode}` and
   `~/{.aws,.claude,.codex,.terraform.d}`
@@ -278,7 +301,7 @@ Then run:
 
 ```sh
 cd ansible
-ansible-playbook --vault-password-file .vault-password playbooks/tailscale.yml
+ansible-playbook playbooks/tailscale.yml
 ```
 
 To advertise the Foundry LAN to Tailscale for Plex and other local services,

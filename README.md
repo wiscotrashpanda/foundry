@@ -7,10 +7,13 @@ configuration kept alongside the playbooks that deploy it.
 ## What This Manages
 
 - Baseline Ansible connectivity for the `foundry` host
+- Apt mirror pinning for faster Ubuntu package installs
 - Human user accounts, shell setup, SSH access, and developer CLIs
-- Tailscale enrollment
+- Tailscale enrollment and advertised subnet routes
 - Thunderbolt-attached storage mounted at `/mnt/store`
+- Tailnet-only SMB sharing from `/mnt/store/share`
 - Docker Engine and the Plex Compose service under `docker/`
+- Self-managed `ansible-pull` convergence through a systemd timer
 - Explicit system package maintenance through a dedicated update playbook
 
 ## Repository Layout
@@ -24,6 +27,8 @@ configuration kept alongside the playbooks that deploy it.
 The detailed runbook lives in [ansible/README.md](ansible/README.md). Start
 there for manual server prerequisites, collection installation, baseline
 provisioning, individual playbook commands, vault usage, and maintenance tasks.
+Local Ansible runs expect `ansible/.vault-password` to exist because
+`ansible/ansible.cfg` points at it; the file is ignored by git.
 
 ## Common Commands
 
