@@ -90,3 +90,23 @@ developer_clis_opencode_install_path: /usr/local/bin/opencode
 developer_clis_opencode_arch_map:
   x86_64: x64
   aarch64: arm64
+
+# Go - installed from the upstream tarball at go.dev/dl. The list endpoint
+# returns stable releases newest-first; the role picks the first stable entry
+# and re-installs only when the host's `go version` lags. The tarball extracts
+# to /usr/local/go per the official install instructions; binaries are exposed
+# via symlinks under /usr/local/bin.
+developer_clis_golang_releases_url: https://go.dev/dl/?mode=json
+developer_clis_golang_download_base_url: https://go.dev/dl
+developer_clis_golang_install_dir: /usr/local/go
+developer_clis_golang_bin_dir: /usr/local/bin
+developer_clis_golang_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armv6l
+  ppc64le: ppc64le
+
+# Alias `python` to `python3` system-wide via Ubuntu's python-is-python3
+# package, which manages the /usr/bin/python -> python3 symlink through
+# update-alternatives.
+developer_clis_python_is_python3_package: python-is-python3
