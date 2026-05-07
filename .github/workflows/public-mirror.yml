@@ -1,0 +1,13 @@
+name: Public Mirror
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  public-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice
+        run: echo "This repository is a public mirror. Primary development and full CI/CD run on a self-hosted Forgejo platform."
