@@ -270,7 +270,7 @@ persists the mount in `/etc/fstab`, and prepares the Plex directories used by
 ## Google Drive Media Backups
 
 The `rclone` role installs rclone and can run a scheduled media backup from
-`/mnt/store/plex` to Google Drive. It is included in `foundry.yml` after the
+`/mnt/store/media` to Google Drive. It is included in `foundry.yml` after the
 storage playbook, but the timer is disabled by default so baseline convergence
 does not require Google credentials.
 
@@ -310,7 +310,7 @@ file:
 ```yaml
 # ansible/group_vars/all/99-private.yml
 rclone_backup_enabled: true
-rclone_backup_destination: foundry-gdrive:foundry/plex
+rclone_backup_destination: foundry-gdrive:foundry/media
 ```
 
 Then apply the role:

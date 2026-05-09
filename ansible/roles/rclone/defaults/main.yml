@@ -10,8 +10,8 @@ rclone_config_content: "{{ vault_rclone_config_content | default('', true) }}"
 rclone_remote_name: foundry-gdrive
 rclone_backup_enabled: false
 rclone_backup_command: copy
-rclone_backup_source: "{{ storage_plex_dir | default('/mnt/store/plex') }}"
-rclone_backup_destination: "{{ rclone_remote_name }}:foundry/plex"
+rclone_backup_source: "{{ storage_plex_dir | default('/mnt/store/media') }}"
+rclone_backup_destination: "{{ rclone_remote_name }}:foundry/media"
 rclone_backup_excludes:
   - /config/**
 rclone_backup_extra_args:

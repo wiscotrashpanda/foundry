@@ -9,6 +9,6 @@ services:
       - TZ=America/Chicago
       - VERSION=docker
     volumes:
-      - /mnt/store/plex-config:/config
+      - /mnt/store/config/plex:/config
       - /mnt/store/media:/media
     restart: unless-stopped
