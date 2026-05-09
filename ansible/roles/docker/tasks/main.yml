@@ -76,15 +76,43 @@
   ansible.builtin.file:
     path: "{{ docker_compose_dir }}"
     state: directory
-    owner: root
-    group: root
-    mode: "0755"
+    owner: "{{ docker_compose_owner }}"
+    group: "{{ docker_compose_group }}"
+    mode: "{{ docker_compose_dir_mode }}"
+
+- name: Read Docker Compose owner uid
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ docker_compose_owner }}"
+  register: docker_compose_owner_uid
+  changed_when: false
+
+- name: Read Docker Compose group entry
+  ansible.builtin.command:
+    argv:
+      - getent
+      - group
+      - "{{ docker_compose_group }}"
+  register: docker_compose_group_getent
+  changed_when: false
+
+- name: Deploy Docker Compose environment defaults
+  ansible.builtin.copy:
+    dest: "{{ docker_compose_env_file }}"
+    owner: "{{ docker_compose_owner }}"
+    group: "{{ docker_compose_group }}"
+    mode: "{{ docker_compose_env_file_mode }}"
+    content: |
+      PLEX_PUID={{ docker_compose_owner_uid.stdout | trim }}
+      PLEX_PGID={{ (docker_compose_group_getent.stdout | trim).split(':')[2] }}
 
 - name: Deploy Docker Compose files
   ansible.builtin.copy:
     src: "{{ docker_repo_root }}/docker/{{ item }}"
     dest: "{{ docker_compose_dir }}/{{ item }}"
-    owner: root
-    group: root
-    mode: "0644"
+    owner: "{{ docker_compose_owner }}"
+    group: "{{ docker_compose_group }}"
+    mode: "{{ docker_compose_file_mode }}"
   loop: "{{ docker_compose_files }}"

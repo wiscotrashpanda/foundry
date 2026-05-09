@@ -1,7 +1,11 @@
 ---
-# Sudo group with passwordless escalation. Created on the host as a manual
-# prerequisite (see ansible/README.md) - the role only adds members to it.
-users_passwordless_sudo_group: admin-sudo
+# Shared group for managed human users. Members get passwordless sudo through
+# a managed sudoers.d rule.
+users_shared_group: "{{ foundry_group | default('foundry') }}"
+users_passwordless_sudo_group: "{{ users_shared_group }}"
+users_passwordless_sudoers_file: "foundry-{{ users_passwordless_sudo_group }}-sudo"
+users_legacy_passwordless_sudoers_files:
+  - foundry-josh-sudo
 
 # Public key installed into each user's authorized_keys. Defaults to the copy
 # bundled with this role so the same value works in both push (controller) and

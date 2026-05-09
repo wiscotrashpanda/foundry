@@ -9,16 +9,39 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
-    owner: root
-    group: root
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
     mode: "{{ item.mode }}"
   loop:
-    - { path: "{{ self_pull_etc_dir }}", mode: "0750" }
-    - { path: "{{ self_pull_state_dir }}", mode: "0755" }
-    - { path: "{{ self_pull_log_dir }}", mode: "0755" }
-    - { path: "{{ self_pull_collections_dir }}", mode: "0755" }
+    - path: "{{ self_pull_etc_dir }}"
+      owner: root
+      group: "{{ self_pull_run_group }}"
+      mode: "{{ self_pull_etc_mode }}"
+    - path: "{{ self_pull_state_dir }}"
+      owner: "{{ self_pull_run_user }}"
+      group: "{{ self_pull_run_group }}"
+      mode: "{{ self_pull_state_mode }}"
+    - path: "{{ self_pull_log_dir }}"
+      owner: "{{ self_pull_run_user }}"
+      group: "{{ self_pull_run_group }}"
+      mode: "{{ self_pull_state_mode }}"
+    - path: "{{ self_pull_collections_dir }}"
+      owner: "{{ self_pull_run_user }}"
+      group: "{{ self_pull_run_group }}"
+      mode: "{{ self_pull_state_mode }}"
   loop_control:
     label: "{{ item.path }}"
+
+- name: Ensure foundry writable state ownership is consistent
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ self_pull_run_user }}"
+    group: "{{ self_pull_run_group }}"
+    recurse: true
+  loop:
+    - "{{ self_pull_state_dir }}"
+    - "{{ self_pull_log_dir }}"
 
 - name: Install foundry-pull wrapper
   ansible.builtin.template:

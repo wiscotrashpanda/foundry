@@ -13,7 +13,7 @@ self_pull_playbook: ansible/foundry.yml
 
 # Files outside the repo that the wrapper passes to ansible-pull. The vault
 # helper is expected to be a shebang script that prints the vault password
-# (e.g. via 1Password's `op` CLI) - or a plain password file with mode 0400.
+# (e.g. via 1Password's `op` CLI) - or a plain password file with mode 0640.
 # private.yml holds the same content as group_vars/all/99-private.yml on the
 # Mac (foundry_users, foundry_user_emails, advertise routes, etc).
 self_pull_vault_password_file: /etc/foundry/.vault-password
@@ -26,6 +26,10 @@ self_pull_collections_dir: /var/lib/foundry/collections
 self_pull_state_dir: /var/lib/foundry
 self_pull_etc_dir: /etc/foundry
 self_pull_log_dir: /var/log/foundry
+self_pull_run_user: "{{ foundry_owner | default('josh') }}"
+self_pull_run_group: "{{ foundry_group | default('foundry') }}"
+self_pull_state_mode: "2775"
+self_pull_etc_mode: "0750"
 
 # Wrapper installed for manual runs and used by the systemd unit.
 self_pull_wrapper_path: /usr/local/bin/foundry-pull

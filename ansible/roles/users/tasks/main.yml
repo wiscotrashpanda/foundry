@@ -23,11 +23,32 @@
     state: present
     lock_timeout: 30
 
+- name: Ensure shared human group exists
+  ansible.builtin.group:
+    name: "{{ users_shared_group }}"
+    state: present
+
 - name: Ensure human user groups exist
   ansible.builtin.group:
     name: "{{ item }}"
     state: present
   loop: "{{ foundry_users }}"
+
+- name: Allow shared human group to use passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ users_passwordless_sudoers_file }}"
+    content: "%{{ users_passwordless_sudo_group }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Remove legacy shared passwordless sudo grants
+  ansible.builtin.file:
+    dest: "/etc/sudoers.d/{{ item }}"
+    state: absent
+  loop: "{{ users_legacy_passwordless_sudoers_files }}"
+  when: item != users_passwordless_sudoers_file
 
 - name: Ensure human users exist
   ansible.builtin.user:
@@ -35,8 +56,7 @@
     group: "{{ item }}"
     shell: /bin/zsh
     create_home: true
-    groups:
-      - "{{ users_passwordless_sudo_group }}"
+    groups: "{{ [users_shared_group, users_passwordless_sudo_group] | unique }}"
     append: true
   loop: "{{ foundry_users }}"
 
@@ -125,7 +145,7 @@
   loop: "{{ foundry_users }}"
   vars:
     users_current_full_name: "{{ foundry_user_full_name }}"
-    users_current_email: "{{ foundry_user_emails[item] }}"
+    users_current_email: "{{ foundry_user_emails[item] | default('') }}"
 
 - name: Install Oh My Zsh for human users
   ansible.builtin.git:

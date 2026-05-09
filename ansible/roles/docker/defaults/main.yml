@@ -20,6 +20,12 @@ docker_packages:
   - docker-buildx-plugin
   - docker-compose-plugin
 docker_compose_dir: /srv/docker
+docker_compose_owner: "{{ foundry_owner | default('josh') }}"
+docker_compose_group: "{{ foundry_group | default('foundry') }}"
+docker_compose_dir_mode: "2775"
+docker_compose_file_mode: "0664"
+docker_compose_env_file: "{{ docker_compose_dir }}/.env"
+docker_compose_env_file_mode: "0660"
 # List of compose files to deploy from the repo's top-level docker/ directory
 # into docker_compose_dir. Paths are relative to the repo root.
 docker_compose_files:

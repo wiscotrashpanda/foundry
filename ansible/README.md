@@ -72,7 +72,9 @@ HandleLidSwitchDocked=ignore
 Restart `systemd-logind` or reboot the server so the setting takes effect.
 
 Create the `admin-sudo` group, allow that group to use passwordless sudo, and
-add the provisioning `ansible` user to it:
+add the provisioning `ansible` user to it. This remains a bootstrap-only path
+for push-mode provisioning; the managed human users get sudo through the
+Ansible-managed `foundry` group:
 
 ```sh
 sudo groupadd --force admin-sudo
@@ -175,7 +177,8 @@ Together they manage:
 
 - human users from `foundry_users`
 - system-wide developer CLIs installed once per host (see below)
-- membership in the `admin-sudo` passwordless sudo group
+- membership in the shared `foundry` group
+- passwordless sudo for every member of the `foundry` group
 - SSH access from the public key bundled at `roles/users/files/foundry.pub`
 - each user's `/home/<user>/code` directory
 - per-user CLI config homes under `~/.config/{gh,tea,gcloud,opencode}` and
@@ -214,8 +217,9 @@ existing ones. The npm globals always re-resolve `@latest`; bump
 opencode compare the installed version against the upstream release feed and
 only download when the host is behind.
 
-User names and email addresses live in the ignored
-`group_vars/all/99-private.yml` file. No auth tokens are stored by Ansible;
+The public defaults manage `josh`, `josh-pc`, and `josh-nbm`. Put local email
+addresses or user-list overrides in the ignored `group_vars/all/99-private.yml`
+file. No auth tokens are stored by Ansible;
 each user runs `gh auth login`, `tea login add`, `aws configure`,
 `gcloud auth login`, `claude`, `codex`, `opencode auth`, etc. from their own
 account when credentials are available.
@@ -258,13 +262,14 @@ not stored in this repo or the Ansible vault.
 The `storage` role authorizes the G-Technology G-DRIVE Thunderbolt device,
 mounts filesystem UUID `c072b758-e4e4-44ea-8251-ef0891930805` at `/mnt/store`,
 persists the mount in `/etc/fstab`, and prepares the Plex directories used by
-`docker/plex-media-server.yml`.
+`docker/plex-media-server.yml`. Managed Plex directories are owned by
+`josh:foundry` by default.
 
 ## SMB
 
 The `samba` role installs Samba, allows only local and Tailnet source addresses,
 disables NetBIOS name service, and serves the `store` share from
-`/mnt/store/share`. Samba still opens TCP port `445` on the host, but
+`/mnt/store`. Samba still opens TCP port `445` on the host, but
 non-Tailnet clients are rejected by Samba's `hosts allow`/`hosts deny` rules.
 
 No new partition is required for this setup. SMB serves a directory from the
@@ -273,8 +278,9 @@ hard isolation, different mount options, a quota boundary, or a separate backup
 and lifecycle policy.
 
 Access is limited to users in `samba_users`, which defaults to `foundry_users`.
-Those users must also have Samba passwords because Samba does not reuse SSH
-keys.
+Those users are members of the shared `foundry` group, and the managed share
+directory is owned by `josh:foundry`. Samba users must also have Samba passwords
+because Samba does not reuse SSH keys.
 
 Set the Samba password once on the server:
 
@@ -301,6 +307,10 @@ smb://foundry/store
 The `docker` role installs Docker Engine from Docker's official apt repository,
 starts the `docker` service, adds existing human users to the `docker` group,
 and deploys the Plex Compose file to `/srv/docker/plex-media-server.yml`.
+The Compose directory, managed Compose files, and managed `.env` file are owned
+by `josh:foundry`. The `.env` file sets Plex's `PUID` from the actual `josh`
+user ID and `PGID` from the actual `foundry` group ID so container-created
+files match host ownership.
 
 Users may need to start a new login session before Docker group membership is
 active.
@@ -391,14 +401,15 @@ The role installs:
 - `/etc/systemd/system/foundry-pull.timer` - 10 minutes after boot, then
   hourly, with a 5-minute randomized delay.
 
-The wrapper expects two files that the role intentionally does **not**
+The systemd service runs the wrapper as `josh:foundry`. The wrapper expects two
+files that the role intentionally does **not**
 manage, because they hold secrets and require interactive setup:
 
-- `/etc/foundry/.vault-password` - vault password helper (mode `0700`,
-  owned by root). Either an executable shebang script that prints the
-  password, or a plain password file (mode `0400`).
+- `/etc/foundry/.vault-password` - vault password helper (mode `0750`,
+  owned by `root:foundry`). Either an executable shebang script that prints the
+  password, or a plain password file (mode `0640`).
 - `/etc/foundry/private.yml` - same content as the Mac's
-  `group_vars/all/99-private.yml` (mode `0600`, owned by root). Holds
+  `group_vars/all/99-private.yml` (mode `0640`, owned by `root:foundry`). Holds
   `foundry_users`, `foundry_user_emails`, advertise routes, etc.
 
 ### One-time bootstrap on foundry
@@ -417,24 +428,25 @@ manage, because they hold secrets and require interactive setup:
 2. Write `/etc/foundry/.vault-password` as an executable shebang script:
 
    ```sh
-   sudo install -d -m 0750 -o root -g root /etc/foundry
+   sudo install -d -m 0750 -o root -g foundry /etc/foundry
    sudo tee /etc/foundry/.vault-password >/dev/null <<'EOF'
    #!/bin/sh
    exec op read "op://<vault>/<item>/<field>"
    EOF
-   sudo chmod 0700 /etc/foundry/.vault-password
+   sudo chown root:foundry /etc/foundry/.vault-password
+   sudo chmod 0750 /etc/foundry/.vault-password
    ```
 
    **Fallback:** if 1Password CLI on a headless box is painful (no biometric
    unlock; service-account-only mode is rate-limited), drop the script and
-   write the raw vault password to the same path with mode `0400`. The
+   write the raw vault password to the same path with mode `0640`. The
    wrapper does not care which form is used.
 
 3. Write `/etc/foundry/private.yml` with the same content as the Mac's
    `group_vars/all/99-private.yml`:
 
    ```sh
-   sudo install -m 0600 -o root -g root \
+   sudo install -m 0640 -o root -g foundry \
      ~/group_vars-99-private.yml /etc/foundry/private.yml
    ```
 

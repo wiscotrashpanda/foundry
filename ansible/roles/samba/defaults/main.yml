@@ -3,7 +3,8 @@ samba_packages:
   - samba
   - smbclient
 
-samba_group: smbusers
+samba_owner: "{{ foundry_owner | default('josh') }}"
+samba_group: "{{ foundry_group | default('foundry') }}"
 samba_users: "{{ foundry_users }}"
 samba_manage_passwords: false
 samba_vault_file: "{{ inventory_dir }}/vault/foundry.yml"
@@ -32,7 +33,7 @@ samba_systemd_after_tailscale: true
 samba_systemd_override_dir: "/etc/systemd/system/{{ samba_service_name }}.service.d"
 
 samba_required_mount_point: /mnt/store
-samba_share_path: "{{ samba_required_mount_point }}/share"
+samba_share_path: "{{ samba_required_mount_point }}"
 samba_share_vfs_objects:
   - catia
   - fruit
@@ -42,7 +43,7 @@ samba_shares:
     comment: Foundry Tailnet shared storage
     path: "{{ samba_share_path }}"
     required_mount: "{{ samba_required_mount_point }}"
-    owner: root
+    owner: "{{ samba_owner }}"
     group: "{{ samba_group }}"
     mode: "2775"
     browseable: true

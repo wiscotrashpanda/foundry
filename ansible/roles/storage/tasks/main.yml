@@ -91,14 +91,14 @@
   ansible.builtin.file:
     path: "{{ storage_plex_dir }}"
     state: directory
-    owner: "{{ storage_plex_uid }}"
-    group: "{{ storage_plex_gid }}"
-    mode: "0755"
+    owner: "{{ storage_plex_owner }}"
+    group: "{{ storage_plex_group }}"
+    mode: "{{ storage_plex_mode }}"
 
 - name: Ensure Plex config directory exists on G-DRIVE
   ansible.builtin.file:
     path: "{{ storage_plex_config_dir }}"
     state: directory
-    owner: "{{ storage_plex_uid }}"
-    group: "{{ storage_plex_gid }}"
-    mode: "0755"
+    owner: "{{ storage_plex_owner }}"
+    group: "{{ storage_plex_group }}"
+    mode: "{{ storage_plex_mode }}"

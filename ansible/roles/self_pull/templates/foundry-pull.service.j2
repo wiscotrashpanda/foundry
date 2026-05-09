@@ -7,6 +7,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User={{ self_pull_run_user }}
+Group={{ self_pull_run_group }}
 ExecStart={{ self_pull_wrapper_path }}
 # Journald captures stdout/stderr; keep it the default.
 Nice=10
