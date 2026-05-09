@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Run Foundry rclone media backup on a schedule
+
+[Timer]
+OnCalendar={{ rclone_backup_on_calendar }}
+RandomizedDelaySec={{ rclone_backup_randomized_delay }}
+Persistent={{ rclone_backup_persistent | ternary('true', 'false') }}
+Unit={{ rclone_backup_unit_name }}.service
+
+[Install]
+WantedBy=timers.target

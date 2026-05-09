@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+set -euo pipefail
+
+exec /usr/bin/rclone {{ rclone_backup_command | quote }} \
+  --config {{ rclone_config_file | quote }} \
+{% for item in rclone_backup_extra_args %}
+  {{ item | quote }} \
+{% endfor %}
+{% for item in rclone_backup_excludes %}
+  --exclude {{ item | quote }} \
+{% endfor %}
+  --log-file {{ rclone_backup_log_file | quote }} \
+  {{ rclone_backup_source | quote }} \
+  {{ rclone_backup_destination | quote }}

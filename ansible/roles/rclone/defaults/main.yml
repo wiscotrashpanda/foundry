@@ -1,0 +1,35 @@
+---
+rclone_packages:
+  - rclone
+
+rclone_config_dir: /etc/rclone
+rclone_config_file: "{{ rclone_config_dir }}/foundry.conf"
+rclone_vault_file: "{{ inventory_dir }}/vault/foundry.yml"
+rclone_config_content: "{{ vault_rclone_config_content | default('', true) }}"
+
+rclone_remote_name: foundry-gdrive
+rclone_backup_enabled: false
+rclone_backup_command: copy
+rclone_backup_source: "{{ storage_plex_dir | default('/mnt/store/plex') }}"
+rclone_backup_destination: "{{ rclone_remote_name }}:foundry/plex"
+rclone_backup_excludes:
+  - /config/**
+rclone_backup_extra_args:
+  - --fast-list
+  - --transfers=4
+  - --checkers=8
+  - --stats=1m
+  - --log-level=INFO
+
+rclone_backup_unit_name: foundry-rclone-media-backup
+rclone_backup_wrapper_path: "/usr/local/bin/{{ rclone_backup_unit_name }}"
+rclone_backup_service_file: "/etc/systemd/system/{{ rclone_backup_unit_name }}.service"
+rclone_backup_timer_file: "/etc/systemd/system/{{ rclone_backup_unit_name }}.timer"
+rclone_backup_on_calendar: "*-*-* 03:30:00"
+rclone_backup_randomized_delay: 30m
+rclone_backup_persistent: true
+rclone_backup_required_mount: "{{ storage_mount_point | default('/mnt/store') }}"
+rclone_backup_log_dir: /var/log/foundry
+rclone_backup_log_file: "{{ rclone_backup_log_dir }}/rclone-media-backup.log"
+rclone_backup_user: "{{ foundry_owner | default('josh') }}"
+rclone_backup_group: "{{ foundry_group | default('foundry') }}"

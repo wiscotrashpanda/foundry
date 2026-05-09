@@ -5,6 +5,7 @@
 - import_playbook: playbooks/tailscale.yml
 - import_playbook: playbooks/users.yml
 - import_playbook: playbooks/storage.yml
+- import_playbook: playbooks/rclone.yml
 - import_playbook: playbooks/samba.yml
 - import_playbook: playbooks/docker.yml
 - import_playbook: playbooks/self-pull.yml

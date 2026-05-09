@@ -1,0 +1,109 @@
+---
+- name: Ensure rclone package exists
+  ansible.builtin.apt:
+    name: "{{ rclone_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure rclone config directory exists
+  ansible.builtin.file:
+    path: "{{ rclone_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ rclone_backup_group }}"
+    mode: "0750"
+
+- name: Check for the optional rclone vault file
+  ansible.builtin.stat:
+    path: "{{ rclone_vault_file }}"
+  register: rclone_vault
+  delegate_to: localhost
+  become: false
+  when:
+    - rclone_backup_enabled | bool
+    - rclone_config_content | length == 0
+
+- name: Load rclone vault variables
+  ansible.builtin.include_vars:
+    file: "{{ rclone_vault_file }}"
+  no_log: true
+  when:
+    - rclone_backup_enabled | bool
+    - rclone_config_content | length == 0
+    - rclone_vault.stat.exists
+
+- name: Deploy rclone config
+  ansible.builtin.copy:
+    dest: "{{ rclone_config_file }}"
+    owner: root
+    group: "{{ rclone_backup_group }}"
+    mode: "0640"
+    content: "{{ rclone_config_content }}"
+  no_log: true
+  when: rclone_config_content | length > 0
+
+- name: Validate enabled rclone backup configuration
+  ansible.builtin.assert:
+    that:
+      - rclone_config_content | length > 0
+      - rclone_backup_command in ['copy', 'sync']
+      - rclone_backup_source | length > 0
+      - rclone_backup_destination | length > 0
+    fail_msg: >
+      Set rclone_config_content and valid backup paths before enabling
+      rclone_backup_enabled.
+  when: rclone_backup_enabled | bool
+
+- name: Ensure rclone backup log directory exists
+  ansible.builtin.file:
+    path: "{{ rclone_backup_log_dir }}"
+    state: directory
+    owner: "{{ rclone_backup_user }}"
+    group: "{{ rclone_backup_group }}"
+    mode: "0750"
+  when: rclone_backup_enabled | bool
+
+- name: Deploy rclone backup wrapper
+  ansible.builtin.template:
+    src: foundry-rclone-media-backup.j2
+    dest: "{{ rclone_backup_wrapper_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: rclone_backup_enabled | bool
+
+- name: Deploy rclone backup service
+  ansible.builtin.template:
+    src: foundry-rclone-media-backup.service.j2
+    dest: "{{ rclone_backup_service_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: rclone_backup_enabled | bool
+
+- name: Deploy rclone backup timer
+  ansible.builtin.template:
+    src: foundry-rclone-media-backup.timer.j2
+    dest: "{{ rclone_backup_timer_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: rclone_backup_enabled | bool
+
+- name: Enable rclone backup timer
+  ansible.builtin.systemd_service:
+    name: "{{ rclone_backup_unit_name }}.timer"
+    daemon_reload: true
+    enabled: true
+    state: started
+  when: rclone_backup_enabled | bool
+
+- name: Disable rclone backup timer
+  ansible.builtin.systemd_service:
+    name: "{{ rclone_backup_unit_name }}.timer"
+    daemon_reload: true
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: not rclone_backup_enabled | bool

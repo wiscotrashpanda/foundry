@@ -1,0 +1,8 @@
+---
+- name: Configure foundry media backups to Google Drive
+  hosts: foundry
+  gather_facts: false
+  become: true
+
+  roles:
+    - role: rclone

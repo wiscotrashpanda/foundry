@@ -119,9 +119,10 @@ ansible-playbook foundry.yml
 4. `playbooks/tailscale.yml`
 5. `playbooks/users.yml`
 6. `playbooks/storage.yml`
-7. `playbooks/samba.yml`
-8. `playbooks/docker.yml`
-9. `playbooks/self-pull.yml`
+7. `playbooks/rclone.yml`
+8. `playbooks/samba.yml`
+9. `playbooks/docker.yml`
+10. `playbooks/self-pull.yml`
 
 ## Individual Playbooks
 
@@ -133,6 +134,7 @@ ansible-playbook playbooks/terminfo.yml
 ansible-playbook playbooks/tailscale.yml
 ansible-playbook playbooks/users.yml
 ansible-playbook playbooks/storage.yml
+ansible-playbook playbooks/rclone.yml
 ansible-playbook playbooks/samba.yml
 ansible-playbook playbooks/docker.yml
 ansible-playbook playbooks/self-pull.yml
@@ -264,6 +266,65 @@ mounts filesystem UUID `c072b758-e4e4-44ea-8251-ef0891930805` at `/mnt/store`,
 persists the mount in `/etc/fstab`, and prepares the Plex directories used by
 `docker/plex-media-server.yml`. Managed Plex directories are owned by
 `josh:foundry` by default.
+
+## Google Drive Media Backups
+
+The `rclone` role installs rclone and can run a scheduled media backup from
+`/mnt/store/plex` to Google Drive. It is included in `foundry.yml` after the
+storage playbook, but the timer is disabled by default so baseline convergence
+does not require Google credentials.
+
+Use `copy` for the default backup behavior. It uploads new and changed files
+without deleting Drive-side files that disappeared locally. Set
+`rclone_backup_command: sync` only if you intentionally want the Google Drive
+destination to mirror local media deletions too.
+
+Create the Google Drive rclone remote once from a machine with a browser:
+
+```sh
+rclone config
+```
+
+Create a `drive` remote named `foundry-gdrive`, authorize it with your Google
+account, then copy the resulting remote stanza from the generated rclone config.
+Store the secret config in the encrypted Ansible vault:
+
+```sh
+cd ansible
+ansible-vault edit vault/foundry.yml
+```
+
+Add the full remote stanza as a literal block:
+
+```yaml
+vault_rclone_config_content: |
+  [foundry-gdrive]
+  type = drive
+  scope = drive
+  token = {"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"..."}
+```
+
+Enable the timer and choose the backup destination in the ignored private vars
+file:
+
+```yaml
+# ansible/group_vars/all/99-private.yml
+rclone_backup_enabled: true
+rclone_backup_destination: foundry-gdrive:foundry/plex
+```
+
+Then apply the role:
+
+```sh
+cd ansible
+ansible-playbook playbooks/rclone.yml
+```
+
+The role writes `/etc/rclone/foundry.conf`, deploys
+`/usr/local/bin/foundry-rclone-media-backup`, and starts the
+`foundry-rclone-media-backup.timer` systemd timer. The default schedule is
+daily at 03:30 with a 30 minute randomized delay. Logs go to
+`/var/log/foundry/rclone-media-backup.log`.
 
 ## SMB
 

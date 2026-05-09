@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Back up Foundry media to Google Drive with rclone
+Documentation=https://rclone.org/drive/
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor={{ rclone_backup_required_mount }}
+
+[Service]
+Type=oneshot
+User={{ rclone_backup_user }}
+Group={{ rclone_backup_group }}
+ExecStart={{ rclone_backup_wrapper_path }}
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
