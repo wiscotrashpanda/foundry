@@ -34,15 +34,22 @@ developer_clis_tea_arch_map:
   aarch64: arm64
 
 # HashiCorp Terraform.
-# HashiCorp publishes Ubuntu suites named after each codename (jammy, noble,
-# plucky, ...) and lags behind brand-new Ubuntu releases. On a host whose
-# codename is not yet published, override `developer_clis_hashicorp_suite` to
-# the most recent published codename (e.g. `noble`) in group_vars/host_vars.
+# HashiCorp publishes Ubuntu suites named after each supported codename and can
+# lag behind brand-new Ubuntu releases. Map unsupported new codenames to the
+# newest supported suite until HashiCorp publishes native packages for them.
+developer_clis_hashicorp_suite_fallbacks:
+  resolute: questing
 developer_clis_hashicorp_keyring_url: https://apt.releases.hashicorp.com/gpg
 developer_clis_hashicorp_keyring_path: /etc/apt/keyrings/hashicorp-archive-keyring.asc
 developer_clis_hashicorp_keyring_checksum: ""
 developer_clis_hashicorp_apt_repo: https://apt.releases.hashicorp.com
-developer_clis_hashicorp_suite: "{{ ansible_facts['distribution_release'] }}"
+developer_clis_hashicorp_suite: >-
+  {{
+    developer_clis_hashicorp_suite_fallbacks.get(
+      ansible_facts['distribution_release'],
+      ansible_facts['distribution_release']
+    )
+  }}
 developer_clis_terraform_package: terraform
 
 # AWS CLI v2 - downloaded directly from AWS, version pulled from the upstream

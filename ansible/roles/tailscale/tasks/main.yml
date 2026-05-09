@@ -199,9 +199,9 @@
     - not (foundry_tailscale_already_enrolled | bool)
     - foundry_tailscale_authkey | trim | length > 0
 
-- name: Apply Tailscale arguments on already-enrolled node without auth key
+- name: Apply Tailscale settings on already-enrolled node without auth key
   ansible.builtin.command:
-    cmd: "{{ foundry_tailscale_binary_path }} up {{ foundry_tailscale_effective_args }}"
+    cmd: "{{ foundry_tailscale_binary_path }} set {{ foundry_tailscale_effective_args }}"
   changed_when: false
   when:
     - foundry_tailscale_state == 'present'
